@@ -1,5 +1,7 @@
 # BuildBridge
 
+Orchestrator connection: use `runParserTask` in `src/parser-interface.js`. Read [the shared contract guide](docs/orchestrator-integration.md), inspect `examples/parser-task.json` and `examples/parser-response.json`, and run `npm run example:parser`. Use `data.supplier_lines` only when non-null; clarification items and delivery notes must be resolved first. Existing parser functions remain supported.
+
 Shared foundation for the October 31, 2026 quoting prototype. Requires Node.js 22 or later; no dependency installation is needed.
 
 Copy `.env.example` to `.env` and add your OpenAI key locally. `.env` is ignored by Git.

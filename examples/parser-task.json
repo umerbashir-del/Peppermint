@@ -1,0 +1,10 @@
+{
+  "schema_version": "1.0",
+  "request_id": "quote-demo-001",
+  "task_id": "parser-001",
+  "agent": "materials_parser",
+  "input": {
+    "text": "20 of 2x4x8 SPF studs\n10 sheets of 4x8 half-inch drywall\n5 boxes of 2.5-inch drywall screws",
+    "format": "text"
+  }
+}
