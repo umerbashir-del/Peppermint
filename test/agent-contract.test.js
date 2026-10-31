@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { runContractTask, requireContract } from '../src/agent-contract.js';
 
-const task = { schema_version: '1.0', request_id: 'quote-001', task_id: 'test-001', agent: 'materials_parser', input: {} };
+const task = { schema_version: '1.0', request_id: 'quote-001', task_id: 'test-001', agent: 'materials_parser', input: { text: '1 bag cement', format: 'text' } };
 const execute = async () => ({ status: 'completed', data: { lines: [] } });
 const run = (value, action = execute) => runContractTask(value, 'materials_parser', () => {}, action);
 
