@@ -1,5 +1,7 @@
 # BuildBridge
 
+Orchestrator connection: use `runSupplierTask` in `src/supplier-interface.js`. Read [the shared contract guide](docs/orchestrator-integration.md), inspect `examples/supplier-task.json` and `examples/supplier-response.json`, and run `npm run example:supplier`. The example uses sample data without API calls; add `-- --live` for live matching. All existing direct-call functions remain supported.
+
 Shared foundation for the October 31, 2026 quoting prototype. Requires Node.js 22 or later; no dependency installation is needed.
 
 Copy `.env.example` to `.env` and add your OpenAI key locally. `.env` is ignored by Git.

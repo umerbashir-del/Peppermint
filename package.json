@@ -7,6 +7,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "example:supplier": "node --env-file=.env examples/run-supplier-task.js"
   }
 }

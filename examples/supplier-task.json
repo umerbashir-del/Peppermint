@@ -1,0 +1,12 @@
+{
+  "schema_version": "1.0",
+  "request_id": "quote-demo-001",
+  "task_id": "supplier-001",
+  "agent": "supplier_quote_desk",
+  "input": {
+    "account_id": "near-limit",
+    "branch": "sample-main",
+    "delivery": null,
+    "lines": [{ "line_id": "1", "item": "2x10x12 SPF joists", "quantity": 40, "unit": "each" }]
+  }
+}
