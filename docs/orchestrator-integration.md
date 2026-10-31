@@ -58,3 +58,5 @@ const parsed = await runParserTask(parserTask); // Local; no API key required.
 For local tests, each feature branch includes task/response JSON examples and `examples/run-*-task.js`. Run its `npm run example:...` script. Research's default example is explicitly mocked, with no claim that its example source is real; pass `--live` for a paid live request. Example responses are snapshots: generated timestamps and live model wording vary.
 
 These are in-process JavaScript interfaces, not HTTP endpoints or a hosted service. If you expose them over a network, validate task envelopes, enforce caller account/branch authorization, and keep credentials/dependencies server-side. Keep `.env` local. The worker tool restrictions and existing iteration budgets remain in force.
+
+Live calls on this feature branch now use Anthropic. Load `ANTHROPIC_API_KEY` and optional `ANTHROPIC_MODEL`/`ANTHROPIC_EFFORT` in the orchestrator process; task/result envelopes remain v1.0. See [Anthropic setup](anthropic-setup.md).

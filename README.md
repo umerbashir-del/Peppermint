@@ -4,7 +4,7 @@ Orchestrator connection: use `runSupplierTask` in `src/supplier-interface.js`. R
 
 Shared foundation for the October 31, 2026 quoting prototype. Requires Node.js 22 or later; no dependency installation is needed.
 
-Copy `.env.example` to `.env` and add your OpenAI key locally. `.env` is ignored by Git.
+Copy `.env.example` to `.env` only if `.env` does not already exist, then add your Anthropic key locally. `.env` is ignored by Git. Live calls use `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` (default `claude-sonnet-5-5`), and `ANTHROPIC_EFFORT` (default `low`). See [Anthropic setup](docs/anthropic-setup.md). No OpenAI key is needed.
 
 Feature branches based on main:
 
@@ -16,7 +16,7 @@ The supplier data is sample data. Quotes remain drafts and require human approva
 
 ## Supplier feature
 
-Run `npm test` to validate the supplier workflow. Import `quote` from `src/supplier-agent.js` and `loadSupplier` from `src/supplier-tools.js`; pass one of the example JSON requests to `quote(request, await loadSupplier())`. Pass `{ live: true }` as the third argument to enable AI tool calls after loading your key into the process environment. Quotes use sample data; calculations are independently validated and results remain drafts.
+Run `npm test` to validate the supplier workflow. Import `quote` from `src/supplier-agent.js` and `loadSupplier` from `src/supplier-tools.js`; pass one of the example JSON requests to `quote(request, await loadSupplier())`. Pass `{ live: true }` as the third argument to enable Anthropic tool calls after loading your key into the process environment. `npm run example:supplier` runs locally with sample data; `npm run example:supplier -- --live` uses the live Anthropic connection. Calculations are independently validated and results remain drafts. The public v1.0 task/result envelopes are unchanged.
 
 ## Substitution validation
 
@@ -54,4 +54,4 @@ Stock checks account for allocations earlier in the same quote without reserving
 
 **Sample behavior changed:** the PRD's SPF-to-Hem-Fir example does not provide grades or a documented approval rule. The sample data deliberately leaves grade unknown and the rule list empty. Its draft now contains only the 15 original joists, a $193.20 partial total, and 25 unresolved units requiring review. Credit is labeled an incomplete estimate. The original $492.20 split and $92.20 credit overage are tested using a clearly fictional, fully specified policy fixture; that fixture is not real-world substitution approval.
 
-Run `npm test` for 21 offline tests covering normal pricing, compatibility, missing specifications, supplier rules, contractor requirements, stock reuse, and the model tool loop. API responses are mocked; live model access is not verified by these tests. All output remains a draft, and `.env` stays local.
+Run `npm test` for 41 offline tests covering normal pricing, compatibility, missing specifications, supplier rules, contractor requirements, stock reuse, common worker contracts, and Anthropic tool transport. API responses are mocked; live model access is not verified by these tests. All output remains a draft, and `.env` stays local.
