@@ -1,5 +1,7 @@
 # BuildBridge
 
+Orchestrator connection: use `runResearchTask` in `src/research-interface.js`. Read [the shared contract guide](docs/orchestrator-integration.md), inspect `examples/research-task.json` and `examples/research-response.json`, and run `npm run example:research`. This example uses explicitly mocked evidence; add `-- --live` to use paid live research. Existing direct-call functions remain supported.
+
 Shared foundation for the October 31, 2026 quoting prototype. Requires Node.js 22 or later; no dependency installation is needed.
 
 Copy `.env.example` to `.env` and add your OpenAI key locally. `.env` is ignored by Git.
