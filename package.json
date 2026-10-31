@@ -9,6 +9,8 @@
     "test": "node --test test/*.test.js",
     "example:supplier": "node --env-file=.env examples/run-supplier-task.js",
     "example:research": "node --env-file=.env examples/run-research-task.js",
-    "example:parser": "node examples/run-parser-task.js"
+    "example:parser": "node examples/run-parser-task.js",
+    "example:draft": "node examples/run-draft-example.js",
+    "draft": "node src/draft-cli.js"
   }
 }

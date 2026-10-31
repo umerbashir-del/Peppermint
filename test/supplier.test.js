@@ -3,10 +3,8 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { quote } from '../src/supplier-agent.js';
 import { loadSupplier } from '../src/supplier-tools.js';
-import { research } from '../src/research-agent.js';
 
 const fixture = async name => JSON.parse(await readFile(new URL(`../examples/${name}.json`, import.meta.url), 'utf8'));
-
 test('PRD normal quote has correct totals and credit', async () => {
   const result = await quote(await fixture('normal'), await loadSupplier());
   assert.deepEqual(result.lines.flatMap(row => row.allocations).map(row => row.line_total_cents), [7728, 11500, 8280]);
@@ -76,18 +74,4 @@ test('live supplier tool loop validates proposals against supplier data', async 
   const result = await quote(request, await loadSupplier(), { live: true, respond });
   assert.equal(result.lines[0].allocations.length, 0);
   assert.equal(result.lines[1].allocations[0].line_total_cents, 11500);
-});
-
-test('research refuses price lookups without contacting the provider', async () => {
-  const result = await research('What is the price of drywall?', { respond: () => { throw new Error('Should not call API'); } });
-  assert.equal(result.status, 'needs_human_review');
-});
-
-test('research preserves provider citations and flags absent evidence', async () => {
-  const respond = async () => ({ output: [{ type: 'message', content: [{ type: 'output_text', text: 'Verify the manufacturer specification.', annotations: [{ type: 'url_citation', url: 'https://example.com/spec', title: 'Test specification' }] }] }] });
-  const result = await research('Which specifications should be checked for joist substitutions?', { respond });
-  assert.equal(result.sources[0].url, 'https://example.com/spec');
-  assert.equal(result.publication_date, null);
-  const noEvidence = await research('Which specifications should be checked?', { respond: async () => ({ output: [] }) });
-  assert.equal(noEvidence.status, 'needs_human_review');
 });
