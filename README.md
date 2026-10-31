@@ -11,3 +11,7 @@ Feature branches based on main:
 - `codex/buildbridge-integration`: both agents, command-line demo, documentation, and complete tests.
 
 The supplier data is sample data. Quotes remain drafts and require human approval.
+
+## Research feature
+
+Run `npm test` for offline tests. Import `research` from `src/research-agent.js` and call it with one material specification question after loading your key into the process environment. The live agent uses paid OpenAI web search and returns citations for human review. It cannot authorize a substitution. API details: https://developers.openai.com/api/docs/guides/tools-web-search
