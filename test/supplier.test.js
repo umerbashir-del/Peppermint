@@ -15,12 +15,14 @@ test('PRD normal quote has correct totals and credit', async () => {
   assert.equal(result.review_status, 'awaiting_rep_approval');
 });
 
-test('partial stock splits the line and flags substitution and credit', async () => {
+test('partial stock with unverified grade and rule does not allocate a substitute', async () => {
   const result = await quote(await fixture('partial-stock'), await loadSupplier());
-  assert.deepEqual(result.lines[0].allocations.map(part => part.quantity), [15, 25]);
-  assert.equal(result.lines[0].allocations[1].substitute, true);
-  assert.equal(result.total_cents, 49220);
-  assert.equal(result.credit.overage_cents, 9220);
+  assert.deepEqual(result.lines[0].allocations.map(part => part.quantity), [15]);
+  assert.equal(result.lines[0].unresolved_quantity, 25);
+  assert.equal(result.lines[0].substitution_checks[0].status, 'needs_human_review');
+  assert.equal(result.total_cents, 19320);
+  assert.equal(result.total_is_partial, true);
+  assert.equal(result.credit.status, 'incomplete_estimate');
   assert.equal(result.review_status, 'needs_human_review');
 });
 
