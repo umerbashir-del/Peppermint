@@ -96,7 +96,7 @@ test('generated price queries are rejected before the search provider', async ()
 
 test('web search uses actual provider sources, not URLs invented in response text', async () => {
   const result = await webSearch('lumber specification', { respond: async body => {
-    assert.deepEqual(body.include, ['web_search_call.action.sources']);
+    assert.deepEqual(body.tools, [{ type: 'web_search', search_context_size: 'medium' }]);
     assert.equal(body.max_tool_calls, 1);
     return { output: [{ type: 'web_search_call', action: { sources: [{ url, title: 'Specification' }, { url: 'file:///secret' }] } }, ...message('https://invented.example/').output] };
   } });

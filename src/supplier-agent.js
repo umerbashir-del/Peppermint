@@ -1,4 +1,4 @@
-import { responses, outputText } from './openai.js';
+import { responses, outputText } from './model-client.js';
 import { normalize, supplierTools } from './supplier-tools.js';
 import { VALIDATE_SUBSTITUTION_TOOL } from './substitution-validator.js';
 

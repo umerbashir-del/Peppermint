@@ -47,7 +47,7 @@ Each worker accepts the same versioned task envelope and returns consistent IDs,
 
 ## Live research and matching
 
-Set `OPENAI_API_KEY` in your local `.env` and choose an accessible `OPENAI_MODEL` if needed. `.env` remains ignored; only the empty `.env.example` is shared.
+The live agents now use Anthropic's Claude Messages API. Set `ANTHROPIC_API_KEY` in your local `.env`; `ANTHROPIC_MODEL` defaults to `claude-sonnet-5-5` and `ANTHROPIC_EFFORT` defaults to `low`. `.env` remains ignored; only the empty `.env.example` is shared. No OpenAI key or separate search-provider key is required. See [Anthropic setup](docs/anthropic-setup.md).
 
 ```powershell
 npm run research -- "Which manufacturer specifications should be checked before substituting joist lumber?"
@@ -55,7 +55,7 @@ npm run quote -- examples/normal.json --live
 npm run example:research -- --live
 ```
 
-Live model commands make paid API requests. Research reads public HTTPS HTML/plain text only, opens only results from the current run, checks quoted excerpts against fetched text, and enforces four searches or two source-read attempts. Missing dates remain null. PDFs, redirects, unreadable pages, and missing evidence require review. API responses are mocked in the test suite; live account access and search quality are not established by offline tests.
+Live model commands make paid Anthropic API requests. The `web_search` wrapper uses Claude's hosted search with one search per wrapper call; `read_source` still fetches approved URLs directly and checks structured excerpts against page text. Research reads public HTTPS HTML/plain text only, opens only results from the current run, and enforces four searches or two source-read attempts. Missing dates remain null. PDFs, redirects, unreadable pages, and missing evidence require review. API responses are mocked in the test suite; passing offline tests alone does not establish live account access or search quality.
 
 ## Supplier and parser limits
 

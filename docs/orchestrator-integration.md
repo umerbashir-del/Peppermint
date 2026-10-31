@@ -59,6 +59,8 @@ For local tests, each feature branch includes task/response JSON examples and `e
 
 These are in-process JavaScript interfaces, not HTTP endpoints or a hosted service. If you expose them over a network, validate task envelopes, enforce caller account/branch authorization, and keep credentials/dependencies server-side. Keep `.env` local. The worker tool restrictions and existing iteration budgets remain in force.
 
+The combined integration branch now uses Anthropic for live calls. Load `ANTHROPIC_API_KEY` and optional `ANTHROPIC_MODEL`/`ANTHROPIC_EFFORT` in the orchestrator process; no task-envelope fields changed. See [Anthropic setup](anthropic-setup.md).
+
 ## Save the assembled draft
 
 After routing any research handoffs, call `saveDraftQuote({ save_id, supplier_result, research_results, unresolved_questions })` from `src/draft-store.js`. This is the `save_draft_quote` orchestrator tool; it does not add a new agent ID or change the worker envelope. It returns a draft receipt and never approves or sends anything. See [draft storage](draft-storage.md) for its schema, replay rules, and rep inspection commands.
