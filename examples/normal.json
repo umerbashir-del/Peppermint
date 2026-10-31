@@ -1,0 +1,10 @@
+{
+  "account_id": "normal",
+  "branch": "sample-main",
+  "delivery": { "zip": "10001", "slot_id": "sample-thursday" },
+  "lines": [
+    { "line_id": "1", "item": "2x4x8 SPF studs", "quantity": 20, "unit": "each" },
+    { "line_id": "2", "item": "4x8 half-inch drywall", "quantity": 10, "unit": "sheet" },
+    { "line_id": "3", "item": "2.5-inch drywall screws", "quantity": 5, "unit": "box" }
+  ]
+}

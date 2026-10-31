@@ -1,0 +1,19 @@
+{
+  "sample_data": true,
+  "as_of": "2026-10-31T12:00:00Z",
+  "branch": "sample-main",
+  "catalog": [
+    { "sku": "STUD-SPF-248", "description": "2x4x8 SPF studs", "aliases": ["2x4x8 SPF studs"], "unit": "each", "list_price_cents": 420, "stock": 200, "allowed_substitutes": [] },
+    { "sku": "DRYWALL-48-HALF", "description": "4x8 half-inch drywall", "aliases": ["4x8 half-inch drywall"], "unit": "sheet", "list_price_cents": 1250, "stock": 100, "allowed_substitutes": [] },
+    { "sku": "SCREWS-25-BOX", "description": "2.5-inch drywall screws", "aliases": ["2.5-inch drywall screws"], "unit": "box", "list_price_cents": 1800, "stock": 50, "allowed_substitutes": [] },
+    { "sku": "JOIST-SPF-21012", "description": "2x10x12 SPF joists", "aliases": ["2x10x12 SPF joists"], "unit": "each", "list_price_cents": 1400, "stock": 15, "allowed_substitutes": ["JOIST-HF-21012"] },
+    { "sku": "JOIST-HF-21012", "description": "2x10x12 Hem-Fir joists", "aliases": ["2x10x12 Hem-Fir joists"], "unit": "each", "list_price_cents": 1300, "stock": 60, "allowed_substitutes": [] }
+  ],
+  "accounts": [
+    { "id": "normal", "tier": "B", "discount_basis_points": 800, "credit_limit_cents": 500000, "open_balance_cents": 120000 },
+    { "id": "near-limit", "tier": "B", "discount_basis_points": 800, "credit_limit_cents": 500000, "open_balance_cents": 460000 }
+  ],
+  "delivery_slots": [
+    { "id": "sample-thursday", "branch": "sample-main", "zip": "10001", "label": "Thursday morning (sample, not reserved)", "fee_cents": 7500 }
+  ]
+}
