@@ -57,7 +57,8 @@ export async function quote(request, data, { live = false, respond = responses }
   try { account = tools.get_account_pricing_and_credit(); }
   catch { needs.push('Account pricing and credit unavailable; list prices only.'); }
   const lines = request.lines.map(line => {
-    const candidates = data.catalog.filter(item => [item.description, ...(item.aliases ?? [])].some(alias => normalize(alias) === normalize(line.item)) && item.unit === line.unit);
+    const requirementsMatch = item => !Object.hasOwn(line, 'required_specs') || (line.required_specs !== null && typeof line.required_specs === 'object' && !Array.isArray(line.required_specs) && Object.entries(line.required_specs).every(([field, value]) => typeof value === 'string' && value.trim() && typeof item.specifications?.[field] === 'string' && normalize(item.specifications[field]) === normalize(value)));
+    const candidates = data.catalog.filter(item => [item.description, ...(item.aliases ?? [])].some(alias => normalize(alias) === normalize(line.item)) && item.unit === line.unit && requirementsMatch(item));
     const proposed = proposals?.filter(match => match.line_id === line.line_id);
     // The prototype accepts exact aliases only; an AI suggestion cannot broaden specifications.
     const item = candidates.length === 1 && (!live || (proposed.length === 1 && proposed[0].sku === candidates[0].sku)) ? candidates[0] : null;
@@ -67,7 +68,7 @@ export async function quote(request, data, { live = false, respond = responses }
       if (!quantity) return;
       const discount = account?.discount_basis_points ?? 0;
       const cents = Math.round(product.list_price_cents * quantity * (10000 - discount) / 10000);
-      row.allocations.push({ sku: product.sku, description: product.description, quantity, unit: product.unit, list_unit_price_cents: product.list_price_cents, line_total_cents: cents, substitute, stock_before: remainingStock.get(product.sku), pricing_basis: account ? 'account discount' : 'list price, account pricing unavailable', source: 'sample supplier dataset', as_of: data.as_of });
+      row.allocations.push({ sku: product.sku, description: product.description, quantity, unit: product.unit, list_unit_price_cents: product.list_price_cents, line_total_cents: cents, substitute, stock_before: remainingStock.get(product.sku), pricing_basis: account ? 'account discount' : 'list price, account pricing unavailable', source: data.source ?? 'sample supplier dataset', as_of: data.as_of });
       remainingStock.set(product.sku, remainingStock.get(product.sku) - quantity);
       row.unresolved_quantity -= quantity;
     };
@@ -98,5 +99,5 @@ export async function quote(request, data, { live = false, respond = responses }
   const incomplete = lines.some(line => line.unresolved_quantity) || Boolean(request.delivery && !delivery);
   const credit = account ? { status: incomplete ? 'incomplete_estimate' : account.open_balance_cents + total > account.credit_limit_cents ? 'would_exceed' : 'within_limit', projected_balance_cents: account.open_balance_cents + total, overage_cents: Math.max(0, account.open_balance_cents + total - account.credit_limit_cents) } : { status: 'unavailable' };
   if (credit.overage_cents > 0) needs.push(`Credit limit would be exceeded by $${(credit.overage_cents / 100).toFixed(2)}.`);
-  return { status: 'draft', review_status: needs.length ? 'needs_human_review' : 'awaiting_rep_approval', sample_data: true, account_id: request.account_id, branch: request.branch, created_at: new Date().toISOString(), currency: 'USD', lines, subtotal_cents: subtotal, delivery, total_cents: total, total_is_partial: incomplete, tax_status: 'not_calculated', credit, needs_human_review: needs, note: 'Sample estimate excluding tax. Stock and delivery are not reserved. Every draft requires rep approval.' };
+  return { status: 'draft', review_status: needs.length ? 'needs_human_review' : 'awaiting_rep_approval', sample_data: Boolean(data.sample_data), account_id: request.account_id, branch: request.branch, created_at: new Date().toISOString(), currency: 'USD', lines, subtotal_cents: subtotal, delivery, total_cents: total, total_is_partial: incomplete, tax_status: 'not_calculated', credit, needs_human_review: needs, note: 'Sample estimate excluding tax. Stock and delivery are not reserved. Every draft requires rep approval.' };
 }

@@ -11,7 +11,7 @@
     "sample_data": true,
     "account_id": "near-limit",
     "branch": "sample-main",
-    "created_at": "2026-10-31T20:11:25.590Z",
+    "created_at": "2026-10-31T22:53:29.902Z",
     "currency": "USD",
     "lines": [
       {
@@ -128,10 +128,10 @@
     {
       "schema_version": "1.0",
       "request_id": "quote-demo-001",
-      "task_id": "research-3363b117f606bb9bc0f49762",
+      "task_id": "research-606492a4fb5655dea739499c",
       "agent": "research",
       "input": {
-        "question": "What manufacturer specification evidence is needed to compare 2x10x12 SPF joists with 2x10x12 Hem-Fir joists, particularly grade, species? Identify missing evidence; do not authorize a substitution.",
+        "question": "What manufacturer specification evidence is needed to compare 2x10x12 SPF joists with 2x10x12 Hem-Fir joists, particularly grade, species? Required specifications: {} Identify missing evidence; do not authorize a substitution.",
         "line_ids": [
           "1"
         ]

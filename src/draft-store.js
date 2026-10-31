@@ -130,13 +130,18 @@ function receipt(record) {
   return { quote_id: record.quote_id, request_id: record.request_id, status: 'draft', review_status: record.review_status, approval_required: true, saved_at: record.saved_at };
 }
 
-export async function saveDraftQuote(input, { directory = DEFAULT_DIRECTORY } = {}) {
+export function prepareDraftContent(input) {
   let serialized;
   try { serialized = JSON.stringify(input); } catch { throw new DraftStoreError('INVALID_DRAFT', 'Draft input must be JSON serializable.'); }
   check(typeof serialized === 'string' && Buffer.byteLength(serialized) <= 2_000_000, 'Draft input must be JSON data of at most 2 MB.');
   const snapshot = JSON.parse(serialized);
   const contents = assemble(snapshot);
   const content_hash = sha(JSON.stringify(canonical(snapshot)));
+  return { snapshot, contents, content_hash };
+}
+
+export async function saveDraftQuote(input, { directory = DEFAULT_DIRECTORY } = {}) {
+  const { snapshot, contents, content_hash } = prepareDraftContent(input);
   const quote_id = 'draft-' + sha(JSON.stringify([contents.request_id, snapshot.save_id]));
   const root = resolve(directory);
   await mkdir(root, { recursive: true, mode: 0o700 });

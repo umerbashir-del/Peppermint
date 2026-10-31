@@ -1,8 +1,30 @@
 # BuildBridge
 
+## Pilot service: sign-in, permissions, and quote review
+
+The integration branch now includes an authenticated quote desk and PostgreSQL-backed review workflow. Your partner's orchestrator is still independent. Requires **Node.js 24+**.
+
+```powershell
+npm ci
+npm run pilot:seed
+npm start
+```
+
+Open [the local quote desk](http://localhost:3000). The one-time demo seed writes generated sign-in details to ignored `output/pilot-demo-credentials.json`; it never replaces existing accounts. Use the administrator to invite users and assign account/branch access. The rep and contractor views use different permissions.
+
+Development uses an embedded PostgreSQL engine persisted in `output/pilot-db/`. Production requires a real shared PostgreSQL `DATABASE_URL`; it cannot silently fall back to local JSON or an embedded database. Existing CLI/agent examples below remain available for development.
+
+The portal supports material corrections, bounded text-PDF uploads, review questions, proposed substitutions, taxes/fees, expiration, credit-manager exceptions, and exact-revision approvals. Publishing makes a reviewed quote visible in the contractor portal; it does not send email. Contractor acceptance and an order request are separate states. An order request stays pending external supplier confirmation; no stock or delivery is reserved.
+
+Read [pilot setup and permissions](docs/pilot-service.md), [operations and recovery](docs/operations.md), and [evaluation datasets](docs/evaluation.md). CI runs tests, a dependency/credential check, synthetic evaluations, container builds, and an encrypted backup/restore drill against PostgreSQL. `npm run evaluate -- eval/fixtures/synthetic.jsonl` runs the local synthetic benchmark.
+
+Hosting, real supplier data, supplier-approved benchmark cases, production secrets, off-site backup storage, and alert destinations still need your deployment configuration. The code is ready to test as a supervised pilot; synthetic tests are not evidence of real quoting accuracy. Scanned PDFs require manual transcription or a separately validated OCR integration.
+
+## Agent and local-file tools
+
 Combined prototype for materials parsing, supplier quoting, specification research, and saved draft review. This integration branch includes the current `codex/parse-materials-list`, `codex/supplier-quote-desk-agent`, and `codex/research-agent` branches, including their common task interfaces and examples. Your partner's orchestrator remains separate.
 
-Requires Node.js 22 or later; no dependency installation is needed. Supplier data is sample data, and nothing can approve, send, reserve, book, or place an order.
+The standalone agent commands use sample data by default. They never approve, send, reserve, book, or place an order. The separate authenticated pilot service adds human review and publication actions.
 
 ## Try it locally
 
@@ -67,4 +89,4 @@ The PRD's sample SPF-to-Hem-Fir replacement lacks grades and an approved policy.
 
 Parsing is conservative and local. It preserves each nonblank material/note record, flags missing details, and blocks handoff when lines/notes are unresolved. Binary PDF reading, OCR, unrestricted prose interpretation, and unit conversions are not implemented. `npm run parse -- examples/materials.txt` and the CSV example run without API calls.
 
-Persistence and review are local files, not a hosted database or approval application. Production ERP access, authentication, account authorization, deployment, and the orchestrator itself remain outside this prototype. Keep saved account data and evidence in the ignored storage directory.
+The legacy `draft` CLI uses local files and is for development/operator use only. The pilot API uses shared database records with authentication, per-request authorization, revisions, and audit history. It never serves the ignored `output/` directory. The orchestrator and live ERP connection remain separate. Keep account data, private evaluations, and credentials out of Git.
