@@ -1,44 +1,57 @@
 # BuildBridge
 
-Starter implementation of the Research Agent and Supplier Quote Desk Agent from the October 31, 2026 PRD. Requires Node.js 22 or later. No dependency installation is needed.
+Orchestrator connection: use `runSupplierTask` in `src/supplier-interface.js`. Read [the shared contract guide](docs/orchestrator-integration.md), inspect `examples/supplier-task.json` and `examples/supplier-response.json`, and run `npm run example:supplier`. The example uses sample data without API calls; add `-- --live` for live matching. All existing direct-call functions remain supported.
 
-## Try the sample supplier workflow
+Shared foundation for the October 31, 2026 quoting prototype. Requires Node.js 22 or later; no dependency installation is needed.
 
-From this folder:
+Copy `.env.example` to `.env` and add your OpenAI key locally. `.env` is ignored by Git.
 
-```powershell
-npm run demo
-npm run quote -- examples/partial-stock.json
-npm test
+Feature branches based on main:
+
+- `codex/research-agent`: public specification research with citations.
+- `codex/supplier-quote-desk-agent`: supplier tools, sample quoting, and credit checks.
+- `codex/buildbridge-integration`: both agents, command-line demo, documentation, and complete tests.
+
+The supplier data is sample data. Quotes remain drafts and require human approval.
+
+## Supplier feature
+
+Run `npm test` to validate the supplier workflow. Import `quote` from `src/supplier-agent.js` and `loadSupplier` from `src/supplier-tools.js`; pass one of the example JSON requests to `quote(request, await loadSupplier())`. Pass `{ live: true }` as the third argument to enable AI tool calls after loading your key into the process environment. Quotes use sample data; calculations are independently validated and results remain drafts.
+
+## Substitution validation
+
+The Supplier Quote Desk Agent has four read-only tools: `search_catalog`, `get_account_pricing_and_credit`, `check_delivery_slots`, and `validate_substitution`.
+
+`validate_substitution({ line_id, requested_sku, substitute_sku, quantity })` checks a candidate against the material line, supplier-listed substitutions, structured product specifications, documented supplier policy, and available branch quantity. Its inputs cannot override supplier specifications or policies. The same validator runs independently during quote assembly, even when the model skips or misinterprets the tool call. It also works without an API key.
+
+```javascript
+import { readFile } from 'node:fs/promises';
+import { loadSupplier, supplierTools } from './src/supplier-tools.js';
+
+const request = JSON.parse(await readFile('examples/partial-stock.json', 'utf8'));
+const tools = supplierTools(await loadSupplier(), request);
+console.log(tools.validate_substitution({
+  line_id: '1', requested_sku: 'JOIST-SPF-21012',
+  substitute_sku: 'JOIST-HF-21012', quantity: 25,
+}));
 ```
 
-The demo and default quote command run a deterministic supplier workflow without an API key. Amounts are returned in integer cents. The PRD examples total $350.08 (normal) and $492.20 (partial stock), with a $92.20 credit overage in the second case. The substitution is also flagged for review.
+Possible results:
 
-## Enable the AI agents
+| Status | Meaning |
+| --- | --- |
+| `approved_candidate` | Known specifications, an explicit supplier rule, matching units, and requested quantity pass. Rep approval and contractor acceptance are still required. |
+| `incompatible` | A known requirement conflicts, units differ, or the candidate is not an allowed substitute. It is not allocated. |
+| `needs_human_review` | Specifications, policy, stock, or inputs are incomplete, invalid, or insufficient. It is not allocated. |
 
-Open `.env` locally and set `OPENAI_API_KEY` to your OpenAI API key. `OPENAI_MODEL` defaults to `gpt-4.1` and can be changed to a model available to your API account that supports the required tools. `.env` is ignored by Git; `.env.example` contains empty configuration for sharing. Do not put a key in source files or chat.
+Results include reasons, field-level checks, available quantity, supplier rule ID, source timestamp, and the requirement for human approval. Each quote line retains `substitution_checks`, including rejected candidates, so no decision is hidden.
 
-```powershell
-npm run quote -- examples/normal.json --live
-npm run research -- "Which manufacturer specifications should be checked before substituting joist lumber?"
-```
+Products use `specifications` maps containing explicit text values. At minimum `size`, `grade`, and `material` must be known on both products. Every additional specification present on either product is compared too. Size, grade, material, pack size, and unit cannot be relaxed. Optional contractor `required_specs` maps on input lines also cannot be relaxed. No unit conversions, strength calculations, code compliance, or engineering equivalence are inferred.
 
-Live commands make paid API requests. The supplier agent can call only `search_catalog`, `get_account_pricing_and_credit`, and `check_delivery_slots`. Those tools are bound to the request account and branch. A maximum of 12 response rounds prevents an endless loop. The application validates proposed matches against exact catalog descriptions/aliases and units, then computes prices, stock allocations, and credit independently. Broader or uncertain matches remain unresolved.
+The supplier dataset can define `substitution_rules` records with `id`, `requested_sku`, `substitute_sku`, `status: 'approved'`, `approved_by`, and an explicit `approved_at` date. Exactly one matching documented approval is required. A noncritical difference such as species requires an explicit `allowed_differences` entry: `{ species: { from: 'SPF', to: 'Hem-Fir' } }`. The same rule cannot override contractor requirements. These records must be maintained by authorized supplier staff; the prototype has no policy-management or approval interface.
 
-The Research Agent uses OpenAI's hosted web search, returning a short answer, citation URLs, and fetch time. Missing publication dates remain unknown. It rejects common price, stock, and account lookup requests before making an API call; its prompt also forbids those topics. Public evidence cannot authorize a substitution. The hosted tool replaces separate custom search/read functions in this starter; its six-call budget does not implement the PRD's exact four-search/two-page split. Research is invoked separately and is not automatically used to change quotes.
+Stock checks account for allocations earlier in the same quote without reserving or changing supplier inventory. The quote may propose a validated partial quantity, with the shortage still shown as unresolved. It never shrinks quantities to fit credit.
 
-Official API reference used: [OpenAI web search documentation](https://developers.openai.com/api/docs/guides/tools-web-search).
+**Sample behavior changed:** the PRD's SPF-to-Hem-Fir example does not provide grades or a documented approval rule. The sample data deliberately leaves grade unknown and the rule list empty. Its draft now contains only the 15 original joists, a $193.20 partial total, and 25 unresolved units requiring review. Credit is labeled an incomplete estimate. The original $492.20 split and $92.20 credit overage are tested using a clearly fictional, fully specified policy fixture; that fixture is not real-world substitution approval.
 
-## Input and supplier data
-
-Quote input is structured JSON: account ID, branch, optional delivery ZIP/slot ID, and material lines with unique string IDs, item descriptions, positive whole quantities, and explicit units. Use `examples/normal.json` as a template. No automatic pack/unit conversions are made.
-
-`data/supplier.json` contains clearly marked sample data, provenance time, two sample accounts, catalog prices and stock, supplier-listed substitutes, and a delivery slot. The Hem-Fir substitution is a fixture from the PRD, not a claim of engineering equivalence. A rep must verify the specifications and contractor acceptance.
-
-Each requested line survives into the result. Unmatched lines and unfulfilled quantities produce a partial total and incomplete credit estimate. Missing account data falls back to clearly labeled list prices and unavailable credit. Duplicate product lines share one per-quote stock allocation. Prices use integer cents with rounding per allocated line after discount.
-
-## Current limits
-
-This is a command-line prototype using sample supplier data, not a live ERP connection. Results are printed as drafts; there is no persistence, approval interface, sending, order placement, stock reservation, or delivery booking. Every draft requires rep approval. Totals exclude tax; delivery uses sample labels rather than promised dates. There is no authentication or multi-tenant account authorization layer, so do not expose these commands as a public service.
-
-The Contractor Buyer Agent, orchestrator, PDF/CSV parsing, production substitution rules, live stock/pricing freshness checks, and quote acceptance workflow are future work. Tests cover the sample workflow and mocked API responses; a real API run requires your key and has not been verified by the offline test suite.
+Run `npm test` for 21 offline tests covering normal pricing, compatibility, missing specifications, supplier rules, contractor requirements, stock reuse, and the model tool loop. API responses are mocked; live model access is not verified by these tests. All output remains a draft, and `.env` stays local.

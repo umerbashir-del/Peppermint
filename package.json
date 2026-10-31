@@ -1,13 +1,14 @@
 {
-  "name": "buildbridge",
-  "version": "0.1.0",
-  "private": true,
-  "type": "module",
+  "name": "buildbridge", "version": "0.2.0", "private": true, "type": "module",
   "engines": { "node": ">=22" },
   "scripts": {
     "demo": "node --env-file=.env src/cli.js demo",
     "quote": "node --env-file=.env src/cli.js quote",
     "research": "node --env-file=.env src/cli.js research",
-    "test": "node --test"
+    "parse": "node src/parse-cli.js",
+    "test": "node --test test/*.test.js",
+    "example:supplier": "node --env-file=.env examples/run-supplier-task.js",
+    "example:research": "node --env-file=.env examples/run-research-task.js",
+    "example:parser": "node examples/run-parser-task.js"
   }
 }
