@@ -1,0 +1,10 @@
+{
+  "schema_version": "1.0",
+  "request_id": "quote-demo-001",
+  "task_id": "research-001",
+  "agent": "research",
+  "input": {
+    "question": "What manufacturer specification evidence is needed to compare 2x10x12 SPF joists with 2x10x12 Hem-Fir joists, particularly grade? Identify missing evidence; do not authorize a substitution.",
+    "line_ids": ["1"]
+  }
+}

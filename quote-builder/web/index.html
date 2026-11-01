@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#15263d">
+  <title>Quote Builder Crew</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header>
+  <div class="brand"><span class="mark">Q</span> Quote Builder Crew</div>
+  <div class="header-right">
+    <span>Construction estimating workspace</span>
+    <button id="logout" class="btn secondary hidden">Sign out</button>
+  </div>
+</header>
+
+<div id="notice" class="notice" role="status" aria-live="polite"></div>
+
+<section id="auth-view" class="auth">
+  <div class="panel">
+    <div class="eyebrow">Welcome back</div>
+    <h1>Sign in to your workspace</h1>
+    <p>Create job drafts, approve quotes, and export approved PDFs.</p>
+    <div id="auth-notice" class="notice" role="alert"></div>
+    <form id="login-form">
+      <div class="field"><label for="tenant">Workspace ID</label><input id="tenant" required maxlength="100" autocomplete="organization"></div>
+      <div class="field"><label for="email">Email address</label><input id="email" type="email" required maxlength="254" autocomplete="username"></div>
+      <div class="field"><label for="password">Password</label><input id="password" type="password" required maxlength="256" autocomplete="current-password"></div>
+      <button class="btn primary full" type="submit">Sign in</button>
+    </form>
+    <p class="small">New workspace? An owner initializes it with the bootstrap endpoint. Contact your administrator.</p>
+  </div>
+</section>
+
+<main id="app-view" class="hidden">
+  <div class="welcome">
+    <div><div class="eyebrow">Overview</div><h1>Good work starts with a solid estimate.</h1>
+      <p>Paste rough job notes, review the sourced draft, and approve it before anything goes to a customer.</p></div>
+    <button id="refresh" class="btn secondary">Refresh</button>
+  </div>
+
+  <div class="stats">
+    <div class="panel"><div class="stat-label">Projects</div><div id="project-count" class="stat-value">-</div></div>
+    <div class="panel"><div class="stat-label">Waiting for review</div><div id="review-count" class="stat-value">-</div></div>
+    <div class="panel"><div class="stat-label">Approved quotes</div><div id="approved-count" class="stat-value">-</div></div>
+  </div>
+
+  <div class="layout">
+    <div>
+      <section class="panel">
+        <h2>New job from notes</h2>
+        <form id="job-form">
+          <div class="field"><label for="job-notes">Job notes</label>
+            <textarea id="job-notes" rows="6" required maxlength="8000" placeholder="Replace 40 ft of 3/4in copper pipe, 2 shutoff valves, Friday install"></textarea></div>
+          <div class="form-grid">
+            <div class="field"><label for="job-project">Project name</label><input id="job-project" required maxlength="200"></div>
+            <div class="field"><label for="job-customer">Customer (optional)</label><input id="job-customer" maxlength="200"></div>
+            <div class="field"><label for="job-overhead">Overhead (%)</label><input id="job-overhead" type="number" min="0" max="100" step="any" value="0"></div>
+            <div class="field"><label for="job-markup">Markup (%)</label><input id="job-markup" type="number" min="0" max="500" step="any" value="0"></div>
+          </div>
+          <button class="btn primary full" type="submit">Create draft</button>
+        </form>
+        <div id="job-result" class="result hidden"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Review queue</h2>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Quote</th><th>Total</th><th>Status</th><th></th></tr></thead>
+          <tbody id="quotes-table"><tr><td colspan="4" class="empty">Sign in to load quotes.</td></tr></tbody>
+        </table></div>
+      </section>
+
+      <section id="quote-detail" class="panel hidden">
+        <h2>Quote review</h2>
+        <div id="quote-body"></div>
+      </section>
+    </div>
+
+    <div>
+      <section class="panel">
+        <h2>Contractor profile</h2>
+        <form id="profile-form">
+          <div class="field"><label for="p-license">License number</label><input id="p-license" maxlength="60"></div>
+          <div class="field"><label for="p-insurance">Insurance</label><input id="p-insurance" maxlength="500"></div>
+          <div class="field"><label for="p-terms">Payment terms</label><input id="p-terms" maxlength="500"></div>
+          <div class="form-grid">
+            <div class="field"><label for="p-rate">Labor rate ($/hr)</label><input id="p-rate" type="number" min="0" max="10000" step="any" required></div>
+            <div class="field"><label for="p-days">Quote valid (days)</label><input id="p-days" type="number" min="1" max="365" value="30" required></div>
+          </div>
+          <button class="btn primary full" type="submit">Save profile</button>
+        </form>
+      </section>
+
+      <section class="panel">
+        <h2>Price list</h2>
+        <p class="small">CSV with columns name, unit, unit_price, supplier (optional). Rows with formula characters or instruction-like text are rejected.</p>
+        <input id="price-file" type="file" accept=".csv,text/csv" class="file">
+        <button id="price-upload" class="btn secondary full">Upload price list</button>
+        <div id="price-result" class="small"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Add scope to project</h2>
+        <form id="scope-form">
+          <div class="field"><label for="scope-project">Project</label><select id="scope-project" required></select></div>
+          <div class="field"><label for="scope-search">Find a price item</label><input id="scope-search" maxlength="100" placeholder="type part of a name"></div>
+          <div class="field"><label for="scope-price">Price item</label><select id="scope-price" required></select></div>
+          <div class="field"><label for="scope-description">Description</label><input id="scope-description" required maxlength="2000"></div>
+          <div class="form-grid">
+            <div class="field"><label for="scope-qty">Quantity</label><input id="scope-qty" type="number" min="0" step="any" value="1" required></div>
+            <div class="field"><label for="scope-hours">Labor hours / unit</label><input id="scope-hours" type="number" min="0" max="500" step="any" value="0" required></div>
+            <div class="field"><label for="scope-waste">Waste (%)</label><input id="scope-waste" type="number" min="0" max="100" step="any" value="0" required></div>
+          </div>
+          <button class="btn primary full" type="submit">Add scope</button>
+        </form>
+      </section>
+
+      <section class="panel">
+        <h2>Projects</h2>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Project</th><th>Created</th></tr></thead>
+          <tbody id="projects-table"><tr><td colspan="2" class="empty">No projects loaded.</td></tr></tbody>
+        </table></div>
+      </section>
+    </div>
+  </div>
+  <footer class="small">Quote Builder Crew. Estimates are decision-support outputs. Verify scope, supplier pricing and tax treatment before issuing.</footer>
+</main>
+<script src="/static/app.js"></script>
+</body>
+</html>

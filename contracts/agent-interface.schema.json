@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BuildBridge agent task and result envelopes v1.0",
+  "oneOf": [{ "$ref": "#/$defs/task" }, { "$ref": "#/$defs/result" }],
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9._:-]{1,128}$" },
+    "agent": { "enum": ["materials_parser", "supplier_quote_desk", "research"] },
+    "task": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema_version", "request_id", "task_id", "agent", "input"],
+      "properties": {
+        "schema_version": { "const": "1.0" }, "request_id": { "$ref": "#/$defs/id" }, "task_id": { "$ref": "#/$defs/id" },
+        "agent": { "$ref": "#/$defs/agent" }, "input": { "type": "object" }
+      },
+      "allOf": [
+        { "if": { "properties": { "agent": { "const": "materials_parser" } } }, "then": { "properties": { "input": { "$ref": "#/$defs/parserInput" } } } },
+        { "if": { "properties": { "agent": { "const": "research" } } }, "then": { "properties": { "input": { "$ref": "#/$defs/researchInput" } } } },
+        { "if": { "properties": { "agent": { "const": "supplier_quote_desk" } } }, "then": { "properties": { "input": { "$ref": "#/$defs/supplierInput" } } } }
+      ]
+    },
+    "parserInput": {
+      "type": "object", "additionalProperties": false, "required": ["text", "format"],
+      "properties": { "text": { "type": "string", "minLength": 1, "maxLength": 100000 }, "format": { "enum": ["text", "csv", "pdf_text"] } }
+    },
+    "researchInput": {
+      "type": "object", "additionalProperties": false, "required": ["question", "line_ids"],
+      "properties": { "question": { "type": "string", "minLength": 1, "maxLength": 3000 }, "line_ids": { "type": "array", "maxItems": 100, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 128 } } }
+    },
+    "materialLine": {
+      "type": "object", "additionalProperties": false, "required": ["line_id", "item", "quantity", "unit"],
+      "properties": {
+        "line_id": { "type": "string", "minLength": 1, "maxLength": 128 }, "item": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "quantity": { "type": "integer", "minimum": 1, "maximum": 100000 }, "unit": { "type": "string", "minLength": 1, "maxLength": 50 },
+        "required_specs": { "type": "object", "additionalProperties": { "type": "string", "minLength": 1, "maxLength": 1000 } }
+      }
+    },
+    "supplierInput": {
+      "type": "object", "additionalProperties": false, "required": ["account_id", "branch", "delivery", "lines"],
+      "properties": {
+        "account_id": { "type": "string", "minLength": 1, "maxLength": 128 }, "branch": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "delivery": { "type": ["object", "null"], "additionalProperties": false, "required": ["zip", "slot_id"], "properties": { "zip": { "type": "string", "pattern": "^\\d{5}(?:-\\d{4})?$" }, "slot_id": { "type": "string", "minLength": 1, "maxLength": 128 } } },
+        "lines": { "type": "array", "minItems": 1, "maxItems": 100, "items": { "$ref": "#/$defs/materialLine" } }
+      }
+    },
+    "issue": {
+      "type": "object", "additionalProperties": false, "required": ["code", "message", "line_ids", "retryable"],
+      "properties": { "code": { "type": "string" }, "message": { "type": "string" }, "line_ids": { "type": "array", "items": { "type": "string" } }, "retryable": { "type": "boolean" } }
+    },
+    "result": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema_version", "request_id", "task_id", "agent", "status", "approval_required", "data", "issues", "handoffs"],
+      "properties": {
+        "schema_version": { "const": "1.0" }, "request_id": { "anyOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }] }, "task_id": { "anyOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }] }, "agent": { "$ref": "#/$defs/agent" },
+        "status": { "enum": ["completed", "needs_human_review", "failed"] }, "approval_required": { "type": "boolean" }, "data": { "type": ["object", "null"] },
+        "issues": { "type": "array", "items": { "$ref": "#/$defs/issue" } }, "handoffs": { "type": "array", "items": { "$ref": "#/$defs/task" } }
+      }
+    }
+  }
+}
