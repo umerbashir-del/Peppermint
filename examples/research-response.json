@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0",
+  "request_id": "quote-demo-001",
+  "task_id": "research-001",
+  "agent": "research",
+  "status": "completed",
+  "approval_required": true,
+  "data": {
+    "status": "evidence_for_human_review",
+    "answer": "Offline fixture: verify manufacturer grade and species; this example does not establish equivalence.",
+    "sources": [
+      {
+        "quoted_text": "Check the manufacturer grade and species specifications before proposing any lumber substitution.",
+        "url": "https://example.com/buildbridge-test-spec",
+        "page_date": null,
+        "date_fetched": "2026-10-31T20:12:04.784Z"
+      }
+    ],
+    "source_url": "https://example.com/buildbridge-test-spec",
+    "page_date": null,
+    "fetched_at": "2026-10-31T20:12:04.784Z",
+    "publication_date": null,
+    "confidence": "medium",
+    "usage": {
+      "searches": 1,
+      "source_reads": 1
+    },
+    "errors": [],
+    "note": "Quotes were checked against fetched page text. Dates remain unknown when absent. Research never authorizes a substitution.",
+    "line_ids": [
+      "1"
+    ]
+  },
+  "issues": [],
+  "handoffs": []
+}

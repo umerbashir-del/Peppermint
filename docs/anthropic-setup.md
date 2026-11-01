@@ -23,8 +23,6 @@ The `quote`, `research`, and live example scripts load `.env` automatically. A p
 
 ## Transport and tools
 
-In a feature-branch checkout, use its own `npm run example:research -- --live` or `npm run example:supplier -- --live` script. The `demo` and `quote` commands shown above are available in the combined integration branch.
-
 `src/model-client.js` selects `src/anthropic.js`. The transport translates the workers' existing internal response records into native Anthropic `messages`, `tool_use`, `tool_result`, tool `input_schema`, and structured `output_config.format`. It preserves entire native assistant content blocks, including opaque signatures, when continuing a tool conversation; it exposes only text/tool outputs to worker logic. It groups multiple tool results into the immediately following user message. Reasoning content is not included in worker results, logs, or saved drafts.
 
 Claude's `web_search_20250305` server tool runs the search with `max_uses: 1`. The worker's separate `read_source` function opens approved results and validates a short quoted excerpt. Search-result URLs and citations come from the provider's source blocks, not URLs invented in response prose. Provider search errors, paused/incomplete turns, and refusals cannot be treated as successful evidence. An answer without actual sources remains unverified. Adaptive-thinking compatibility uses automatic tool selection, with source/quote checks enforcing the outcome in code.
