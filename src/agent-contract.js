@@ -80,7 +80,7 @@ export async function runContractTask(task, agent, validateInput, execute) {
     return { ...result, approval_required: payload.approval_required ?? false, ...payload };
   } catch (error) {
     const invalid = error instanceof ContractError;
-    const retryable = !invalid && (['TimeoutError', 'AbortError'].includes(error?.name) || ['ETIMEDOUT', 'ECONNRESET', 'EAI_AGAIN'].includes(error?.cause?.code));
+    const retryable = !invalid && (['TimeoutError', 'AbortError'].includes(error?.name) || ['ETIMEDOUT', 'ECONNRESET', 'EAI_AGAIN'].includes(error?.cause?.code) || error?.status === 429 || (Number.isInteger(error?.status) && error.status >= 500 && error.status <= 599));
     result.issues = [issue(invalid ? 'INVALID_INPUT' : retryable ? 'TEMPORARY_FAILURE' : 'AGENT_FAILED', invalid ? error.message : 'Agent execution failed. Check local configuration or logs without exposing secrets; retry only when marked retryable.', [], retryable)];
     return result;
   }

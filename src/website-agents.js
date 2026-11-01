@@ -6,6 +6,21 @@ import { runParserTask } from './parser-interface.js';
 import { runSupplierTask } from './supplier-interface.js';
 import { runResearchTask } from './research-interface.js';
 import { responses } from './anthropic.js';
+import { issue } from './agent-contract.js';
+
+function researchMatches(result, task) {
+  return result && result.schema_version === task.schema_version && result.request_id === task.request_id
+    && result.task_id === task.task_id && result.agent === 'research'
+    && ['completed', 'needs_human_review', 'failed'].includes(result.status)
+    && Array.isArray(result.issues) && Array.isArray(result.handoffs) && result.handoffs.length === 0
+    && (result.status === 'failed' && result.data === null || result.data && JSON.stringify(result.data.line_ids) === JSON.stringify(task.input.line_ids))
+    && (result.status !== 'completed' || Array.isArray(result.data.sources) && result.data.sources.length > 0);
+}
+
+function failedResearch(task, code) {
+  return { schema_version: task.schema_version, request_id: task.request_id, task_id: task.task_id, agent: 'research', status: 'failed', approval_required: true, data: null,
+    issues: [issue(code, 'Research handoff could not be verified; supplier questions still require review.', task.input.line_ids)], handoffs: [] };
+}
 
 export async function websiteSupplier(tenantId) {
   const file = process.env.QBC_SUPPLIER_BINDINGS_FILE;
@@ -29,8 +44,22 @@ export function supplierFingerprint(result) {
   return createHash('sha256').update(JSON.stringify(stable(business))).digest('hex');
 }
 
+function validateSource(binding, data) {
+  const nonnegative = value => Number.isSafeInteger(value) && value >= 0;
+  const account = data?.accounts?.find(item => item.id === binding.account_id);
+  if (!account || data.branch !== binding.branch || !nonnegative(account.open_balance_cents)
+    || !nonnegative(account.credit_limit_cents) || !nonnegative(account.discount_basis_points) || account.discount_basis_points > 10000
+    || !Array.isArray(data.catalog) || data.catalog.length === 0 || data.catalog.length > 5000
+    || new Set(data.catalog.map(item => item.sku)).size !== data.catalog.length
+    || data.catalog.some(item => typeof item.sku !== 'string' || !item.sku || typeof item.description !== 'string'
+      || typeof item.unit !== 'string' || !nonnegative(item.list_price_cents) || !nonnegative(item.stock))) {
+    throw new Error('Supplier pricing, stock, or account source is invalid.');
+  }
+}
+
 export async function runWebsiteAgents(input, { load = websiteSupplier, respond = responses, researchOptions = {}, runResearch = runResearchTask, live = true } = {}) {
   const { binding, data } = await load(input.tenant_id);
+  validateSource(binding, data);
   if (input.operation === 'context') return { account_id: binding.account_id, branch: binding.branch, sample_data: Boolean(data.sample_data), source: data.source ?? 'Sample supplier dataset' };
   const base = { schema_version: '1.0', request_id: input.request_id };
   const parsed = input.operation === 'check' ? null : await runParserTask({ ...base, task_id: 'website-parser', agent: 'materials_parser', input: { text: input.text, format: 'text' } });
@@ -40,13 +69,19 @@ export async function runWebsiteAgents(input, { load = websiteSupplier, respond 
   const timer = setTimeout(() => controller.abort(), 180000);
   let calls = 0;
   const bounded = async body => {
-    if (++calls > 20) throw new Error('Website agent model-call limit reached.');
+    if (calls >= 20) throw new Error('Website agent model-call limit reached.');
+    calls++;
     return respond(body, { signal: controller.signal });
   };
   try {
     const supplier = await runSupplierTask({ ...base, task_id: 'website-supplier', agent: 'supplier_quote_desk', input: { account_id: binding.account_id, branch: binding.branch, delivery: null, lines } }, { supplierData: data, live: input.operation === 'check' ? false : live, respond: bounded });
     const research = [];
-    if (input.operation !== 'check') for (const task of supplier.handoffs.slice(0, 3)) research.push(await runResearch(task, { ...researchOptions, respond: bounded }));
+    if (input.operation !== 'check') for (const task of supplier.handoffs.slice(0, 3)) {
+      try {
+        const result = await runResearch(task, { ...researchOptions, respond: bounded });
+        research.push(researchMatches(result, task) ? result : failedResearch(task, 'HANDOFF_MISMATCH'));
+      } catch { research.push(failedResearch(task, 'HANDOFF_FAILED')); }
+    }
     const account = data.accounts.find(account => account.id === binding.account_id);
     const commercialCredit = input.operation !== 'check' || (Number.isSafeInteger(input.commercial_total_cents) && input.commercial_total_cents >= 0 && account.open_balance_cents + input.commercial_total_cents <= account.credit_limit_cents);
     const approvalEligible = input.operation !== 'check' || data.sample_data || (data.commercial_use === true && data.stock_confirmed === true && Date.parse(data.valid_until) > Date.now());

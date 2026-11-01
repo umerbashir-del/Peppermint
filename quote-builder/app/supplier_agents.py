@@ -17,6 +17,36 @@ from app.quotes import build_quote, load_profile
 _slots = asyncio.Semaphore(2)
 
 
+def validate_worker_result(result, payload):
+    if not isinstance(result, dict):
+        raise ValueError('invalid worker result')
+    if payload.get('operation') == 'context':
+        return
+    if not isinstance(result.get('ready'), bool) or not isinstance(result.get('research'), list):
+        raise ValueError('invalid worker status')
+    def envelope(value, agent, task_id):
+        if (not isinstance(value, dict) or value.get('schema_version') != '1.0'
+            or value.get('request_id') != payload.get('request_id') or value.get('task_id') != task_id
+            or value.get('agent') != agent or value.get('status') not in ('completed', 'needs_human_review', 'failed')
+            or not isinstance(value.get('issues'), list) or not isinstance(value.get('handoffs'), list)):
+            raise ValueError('invalid worker envelope')
+        if any(not isinstance(issue, dict) or not isinstance(issue.get('message'), str) for issue in value['issues']):
+            raise ValueError('invalid worker issues')
+    supplier = result.get('supplier')
+    if payload.get('operation') == 'run':
+        envelope(result.get('parser'), 'materials_parser', 'website-parser')
+    if supplier is not None:
+        envelope(supplier, 'supplier_quote_desk', 'website-supplier')
+    if result['ready']:
+        if (not supplier or supplier['status'] != 'completed' or not isinstance(supplier.get('data'), dict)
+            or not isinstance(result.get('lines'), list) or not result['lines']
+            or not isinstance(result.get('fingerprint'), str) or not isinstance(result.get('supplier_scope'), dict)
+            or not isinstance(result.get('available_credit_cents'), int)):
+            raise ValueError('incomplete ready result')
+    if supplier is None and (result['ready'] or result['research']):
+        raise ValueError('missing supplier handoff')
+
+
 @asynccontextmanager
 async def worker_slot():
     try:
@@ -36,17 +66,18 @@ async def bridge(payload):
                 os.getenv('QBC_NODE_BINARY', 'node'), str(ROOT / 'src/website-agent-bridge.js'),
                 cwd=str(ROOT), stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.DEVNULL, limit=2_000_000)
-        except OSError:
+        except (OSError, NotImplementedError):
             raise HTTPException(503, 'The supplier agent runtime is unavailable.') from None
         try:
             stdout, _ = await asyncio.wait_for(process.communicate(json.dumps(payload).encode()), 200)
             if len(stdout) > 2_000_000:
                 raise ValueError('oversized response')
             reply = json.loads(stdout)
-            if process.returncode or not reply.get('ok'):
+            if process.returncode or not isinstance(reply, dict) or reply.get('ok') is not True or not isinstance(reply.get('result'), dict):
                 raise ValueError('worker failed')
+            validate_worker_result(reply['result'], payload)
             return reply['result']
-        except (ValueError, asyncio.TimeoutError):
+        except (ValueError, asyncio.TimeoutError, OSError):
             raise HTTPException(503, 'Supplier agents could not finish. Check server configuration or try again.') from None
         finally:
             if process.returncode is None:
@@ -71,7 +102,8 @@ async def execute(c_factory, user, job, policy):
     ready = agents['ready']
     if not ready and not questions:
         questions.append('Supplier pricing, stock, or credit requires review before drafting.')
-    output = {'workflow': 'supplier', 'status': 'ready' if ready else 'needs_input', 'failed_half': None,
+    failed_agent = 'supplier' if supplier and supplier['status'] == 'failed' else 'parser' if agents['parser']['status'] == 'failed' else None
+    output = {'workflow': 'supplier', 'status': 'failed' if failed_agent else 'ready' if ready else 'needs_input', 'failed_half': failed_agent,
               'items': [], 'missing': [], 'questions': questions, 'flags': [], 'problems': [], 'trace': [],
               'quote': None, 'project_id': None, 'policy': policy, 'agents': agents}
     with c_factory() as c:
