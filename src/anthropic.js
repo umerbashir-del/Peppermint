@@ -86,15 +86,18 @@ export function normalizeMessage(message) {
   return { status: 'completed', output };
 }
 
-export async function responses(body, { fetchImpl = fetch, apiKey = process.env.ANTHROPIC_API_KEY } = {}) {
+export async function responses(body, { fetchImpl = fetch, apiKey = process.env.ANTHROPIC_API_KEY, signal } = {}) {
   if (typeof apiKey !== 'string' || !apiKey.trim() || apiKey === 'your_api_key_here') throw new Error('Add ANTHROPIC_API_KEY to your local .env file first.');
   const response = await fetchImpl('https://api.anthropic.com/v1/messages', {
     method: 'POST', headers: { 'x-api-key': apiKey, 'anthropic-version': '2026-10-21', 'Content-Type': 'application/json' },
-    body: JSON.stringify(toAnthropicRequest(body)), signal: AbortSignal.timeout(90000),
+    body: JSON.stringify(toAnthropicRequest(body)), signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(90000)]) : AbortSignal.timeout(90000),
   });
   // Never print provider error bodies: they may contain credentials/input data.
   if (!response.ok) throw new AnthropicApiError(response.status);
-  return normalizeMessage(await response.json());
+  const message = await response.json();
+  const result = normalizeMessage(message);
+  result.usage = { input_tokens: message.usage?.input_tokens ?? 0, output_tokens: message.usage?.output_tokens ?? 0, search_requests: message.usage?.server_tool_use?.web_search_requests ?? 0 };
+  return result;
 }
 
 export function outputText(response) {

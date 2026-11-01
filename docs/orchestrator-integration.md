@@ -8,7 +8,7 @@ All three feature branches include the same v1.0 envelope helpers and JSON Schem
 | `supplier_quote_desk` | `runSupplierTask` from `src/supplier-interface.js` | `{ account_id, branch, delivery, lines }` |
 | `research` | `runResearchTask` from `src/research-interface.js` | `{ question, line_ids }` |
 
-Each adapter belongs to its feature branch; a checkout of one branch does not include the others. To combine them, merge/cherry-pick the feature work into your integration branch and resolve existing README/package-script differences. The shared contract files are identical. This package does not implement or take over the orchestrator.
+Each adapter is maintained on its feature branch. The `codex/buildbridge-integration` branch now combines all three current workers and draft storage, so your orchestrator can import them together from that checkout. Shared contract files are identical across the feature branches. This package does not implement or take over the orchestrator.
 
 ## Task envelope
 
@@ -59,4 +59,8 @@ For local tests, each feature branch includes task/response JSON examples and `e
 
 These are in-process JavaScript interfaces, not HTTP endpoints or a hosted service. If you expose them over a network, validate task envelopes, enforce caller account/branch authorization, and keep credentials/dependencies server-side. Keep `.env` local. The worker tool restrictions and existing iteration budgets remain in force.
 
-Live calls on this feature branch now use Anthropic. Load `ANTHROPIC_API_KEY` and optional `ANTHROPIC_MODEL`/`ANTHROPIC_EFFORT` in the orchestrator process; task/result envelopes remain v1.0. See [Anthropic setup](anthropic-setup.md).
+The combined integration branch now uses Anthropic for live calls. Load `ANTHROPIC_API_KEY` and optional `ANTHROPIC_MODEL`/`ANTHROPIC_EFFORT` in the orchestrator process; no task-envelope fields changed. See [Anthropic setup](anthropic-setup.md).
+
+## Save the assembled draft
+
+After routing any research handoffs, call `saveDraftQuote({ save_id, supplier_result, research_results, unresolved_questions })` from `src/draft-store.js`. This is the `save_draft_quote` orchestrator tool; it does not add a new agent ID or change the worker envelope. It returns a draft receipt and never approves or sends anything. See [draft storage](draft-storage.md) for its schema, replay rules, and rep inspection commands.
