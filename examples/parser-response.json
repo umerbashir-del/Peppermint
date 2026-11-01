@@ -1,0 +1,71 @@
+{
+  "schema_version": "1.0",
+  "request_id": "quote-demo-001",
+  "task_id": "parser-001",
+  "agent": "materials_parser",
+  "status": "completed",
+  "approval_required": false,
+  "data": {
+    "status": "parsed",
+    "format": "text",
+    "lines": [
+      {
+        "line_id": "1",
+        "raw_text": "20 of 2x4x8 SPF studs",
+        "normalized_name": "2x4x8 SPF studs",
+        "item": "2x4x8 SPF studs",
+        "quantity": 20,
+        "unit": "each",
+        "kind": "material",
+        "ambiguity_flag": false,
+        "reasons": []
+      },
+      {
+        "line_id": "2",
+        "raw_text": "10 sheets of 4x8 half-inch drywall",
+        "normalized_name": "4x8 half-inch drywall",
+        "item": "4x8 half-inch drywall",
+        "quantity": 10,
+        "unit": "sheet",
+        "kind": "material",
+        "ambiguity_flag": false,
+        "reasons": []
+      },
+      {
+        "line_id": "3",
+        "raw_text": "5 boxes of 2.5-inch drywall screws",
+        "normalized_name": "2.5-inch drywall screws",
+        "item": "2.5-inch drywall screws",
+        "quantity": 5,
+        "unit": "box",
+        "kind": "material",
+        "ambiguity_flag": false,
+        "reasons": []
+      }
+    ],
+    "needs_human_review": [],
+    "escalation": null,
+    "supplier_lines": [
+      {
+        "line_id": "1",
+        "item": "2x4x8 SPF studs",
+        "quantity": 20,
+        "unit": "each"
+      },
+      {
+        "line_id": "2",
+        "item": "4x8 half-inch drywall",
+        "quantity": 10,
+        "unit": "sheet"
+      },
+      {
+        "line_id": "3",
+        "item": "2.5-inch drywall screws",
+        "quantity": 5,
+        "unit": "box"
+      }
+    ]
+  },
+  "issues": [],
+  "handoffs": []
+}

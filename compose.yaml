@@ -1,0 +1,44 @@
+services:
+  db:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: buildbridge
+      POSTGRES_USER: buildbridge_owner
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:?Set DATABASE_PASSWORD locally}
+    volumes: [database:/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U buildbridge_owner -d buildbridge]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+  app:
+    build: {context: ., target: application}
+    environment:
+      DATABASE_URL: ${RUNTIME_DATABASE_URL:?Provision a restricted runtime database login}
+      APP_ORIGIN: ${APP_ORIGIN:?Set your HTTPS application origin}
+      METRICS_TOKEN: ${METRICS_TOKEN:?Set a random operator metrics token}
+      SUPPLIER_DATA_FILE: /supplier/source.json
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-5-5}
+      ALLOW_SAMPLE_DATA: "false"
+    volumes: ["${SUPPLIER_DATA_DIRECTORY:?Mount the supplier source directory}:/supplier:ro"]
+    ports: ["127.0.0.1:3000:3000"]
+    depends_on: {db: {condition: service_healthy}}
+    restart: unless-stopped
+    mem_limit: 768m
+    cpus: 2
+    read_only: true
+    tmpfs: [/tmp]
+  backups:
+    build: {context: ., target: operations}
+    environment:
+      DATABASE_URL: ${BACKUP_DATABASE_URL:?Provision a database backup login}
+      BACKUP_KEY: ${BACKUP_KEY:?Set a separate 32-byte backup encryption key}
+      BACKUP_INTERVAL_HOURS: "6"
+    volumes: [backups:/backups]
+    depends_on: {db: {condition: service_healthy}}
+    restart: "on-failure:3"
+volumes:
+  database:
+  backups:

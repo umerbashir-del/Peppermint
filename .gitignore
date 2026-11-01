@@ -5,3 +5,7 @@ node_modules/
 output/
 coverage/
 *.log
+eval/private/
+backups/
+.pgpass
+.pg_service.conf

@@ -1,0 +1,35 @@
+name: BuildBridge checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-bookworm
+        env: {POSTGRES_PASSWORD: ci-only-password, POSTGRES_DB: buildbridge_test}
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U postgres" --health-interval 10s --health-timeout 5s --health-retries 5
+    env:
+      TEST_DATABASE_URL: postgres://postgres:ci-only-password@localhost:5432/buildbridge_test
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: {node-version: 24, cache: npm}
+      - run: npm ci
+      - run: npm audit --omit=dev --audit-level=high
+      - run: npm run check
+      - run: npm test
+      - run: npm run evaluate -- eval/fixtures/synthetic.jsonl --output output/evaluation.json
+      - run: docker build --target application -t buildbridge-check .
+      - run: docker build --target operations -t buildbridge-ops-check .
+      - name: Verify encrypted backup and isolated restore
+        run: node ops/ci-recovery.js
+        env:
+          DATABASE_URL: ${{ env.TEST_DATABASE_URL }}
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with: {name: synthetic-evaluation, path: output/evaluation.json, if-no-files-found: ignore}

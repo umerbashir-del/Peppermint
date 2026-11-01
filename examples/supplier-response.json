@@ -1,0 +1,141 @@
+{
+  "schema_version": "1.0",
+  "request_id": "quote-demo-001",
+  "task_id": "supplier-001",
+  "agent": "supplier_quote_desk",
+  "status": "needs_human_review",
+  "approval_required": true,
+  "data": {
+    "status": "draft",
+    "review_status": "needs_human_review",
+    "sample_data": true,
+    "account_id": "near-limit",
+    "branch": "sample-main",
+    "created_at": "2026-10-31T22:53:29.902Z",
+    "currency": "USD",
+    "lines": [
+      {
+        "line_id": "1",
+        "item": "2x10x12 SPF joists",
+        "quantity": 40,
+        "unit": "each",
+        "allocations": [
+          {
+            "sku": "JOIST-SPF-21012",
+            "description": "2x10x12 SPF joists",
+            "quantity": 15,
+            "unit": "each",
+            "list_unit_price_cents": 1400,
+            "line_total_cents": 19320,
+            "substitute": false,
+            "stock_before": 15,
+            "pricing_basis": "account discount",
+            "source": "sample supplier dataset",
+            "as_of": "2026-10-31T12:00:00Z"
+          }
+        ],
+        "unresolved_quantity": 25,
+        "substitution_checks": [
+          {
+            "status": "needs_human_review",
+            "line_id": "1",
+            "requested_sku": "JOIST-SPF-21012",
+            "substitute_sku": "JOIST-HF-21012",
+            "requested_quantity": 25,
+            "available_quantity": 60,
+            "rule_id": null,
+            "checks": [
+              {
+                "field": "unit",
+                "outcome": "match"
+              },
+              {
+                "field": "supplier_rule",
+                "outcome": "needs_human_review"
+              },
+              {
+                "field": "size",
+                "outcome": "match"
+              },
+              {
+                "field": "grade",
+                "outcome": "needs_human_review"
+              },
+              {
+                "field": "material",
+                "outcome": "match"
+              },
+              {
+                "field": "species",
+                "outcome": "needs_human_review"
+              },
+              {
+                "field": "stock",
+                "outcome": "available"
+              }
+            ],
+            "reasons": [
+              "A single documented, approved supplier substitution rule is required.",
+              "Missing or unknown grade; compatibility cannot be confirmed.",
+              "Substitute species differs without an applicable permitted equivalence."
+            ],
+            "source": "sample supplier dataset",
+            "as_of": "2026-10-31T12:00:00Z",
+            "requires_rep_approval": true
+          }
+        ]
+      }
+    ],
+    "subtotal_cents": 19320,
+    "delivery": null,
+    "total_cents": 19320,
+    "total_is_partial": true,
+    "tax_status": "not_calculated",
+    "credit": {
+      "status": "incomplete_estimate",
+      "projected_balance_cents": 479320,
+      "overage_cents": 0
+    },
+    "needs_human_review": [
+      "Line 1: substitute JOIST-HF-21012 is needs_human_review: A single documented, approved supplier substitution rule is required. Missing or unknown grade; compatibility cannot be confirmed. Substitute species differs without an applicable permitted equivalence.",
+      "Line 1: 25 units unavailable."
+    ],
+    "note": "Sample estimate excluding tax. Stock and delivery are not reserved. Every draft requires rep approval."
+  },
+  "issues": [
+    {
+      "code": "QUOTE_REVIEW_REQUIRED",
+      "message": "Line 1: substitute JOIST-HF-21012 is needs_human_review: A single documented, approved supplier substitution rule is required. Missing or unknown grade; compatibility cannot be confirmed. Substitute species differs without an applicable permitted equivalence.",
+      "line_ids": [],
+      "retryable": false
+    },
+    {
+      "code": "QUOTE_REVIEW_REQUIRED",
+      "message": "Line 1: 25 units unavailable.",
+      "line_ids": [],
+      "retryable": false
+    },
+    {
+      "code": "LINE_UNRESOLVED",
+      "message": "Some requested units remain unresolved.",
+      "line_ids": [
+        "1"
+      ],
+      "retryable": false
+    }
+  ],
+  "handoffs": [
+    {
+      "schema_version": "1.0",
+      "request_id": "quote-demo-001",
+      "task_id": "research-606492a4fb5655dea739499c",
+      "agent": "research",
+      "input": {
+        "question": "What manufacturer specification evidence is needed to compare 2x10x12 SPF joists with 2x10x12 Hem-Fir joists, particularly grade, species? Required specifications: {} Identify missing evidence; do not authorize a substitution.",
+        "line_ids": [
+          "1"
+        ]
+      }
+    }
+  ]
+}
