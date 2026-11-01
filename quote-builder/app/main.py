@@ -20,6 +20,7 @@ from app import ratelimit
 from app.audit import audit, verify_chain
 from app.catalog import MAX_BYTES, UNITS, parse_price_csv
 from app.crew import service as crew_service
+from app import supplier_agents
 from app.db import connect, init_db
 from app.logging_setup import configure
 from app.money import cents
@@ -178,6 +179,7 @@ class ApproveIn(BaseModel):
 
 
 class JobIn(BaseModel):
+    workflow: Literal['crew', 'supplier'] = 'crew'
     notes: str = Field(min_length=1, max_length=8000)
     project_name: str = Field(min_length=1, max_length=200)
     customer_name: str | None = Field(default=None, max_length=200)
@@ -470,6 +472,9 @@ def evidence_list(scope_id: str | None = None, u=Depends(current_user)):
 @app.post("/quotes")
 def create_quote(data: QuoteIn, u=Depends(role("owner", "admin", "estimator"))):
     with connect() as c:
+        job = c.execute('SELECT result_json FROM jobs WHERE project_id=? AND tenant_id=?', (data.project_id, u['tenant_id'])).fetchone()
+        if job and json.loads(job['result_json']).get('workflow') == 'supplier':
+            raise HTTPException(409, 'Create a fresh supplier-materials job to reprice this supplier quote.')
         return build_quote(c, u, data.project_id, _policy(data))
 
 
@@ -491,11 +496,13 @@ def quote_detail(quote_id: str, u=Depends(current_user)):
         raw = quote.pop("snapshot_json")
     snapshot = json.loads(raw) if raw else None
     verified = bool(snapshot is not None and snapshot_hash(snapshot) == quote["snapshot_hash"])
+    if snapshot and u['role'] == 'viewer':
+        snapshot.pop('supplier_agents', None)
     return {"quote": quote, "snapshot": snapshot, "snapshot_verified": verified}
 
 
 @app.post("/quotes/{quote_id}/approve")
-def approve(quote_id: str, data: ApproveIn, u=Depends(role("owner", "admin", "reviewer"))):
+async def approve(quote_id: str, data: ApproveIn, u=Depends(role("owner", "admin", "reviewer"))):
     with connect() as c:
         q = c.execute("SELECT * FROM quotes WHERE id=? AND tenant_id=?", (quote_id, u["tenant_id"])).fetchone()
         if not q:
@@ -506,7 +513,16 @@ def approve(quote_id: str, data: ApproveIn, u=Depends(role("owner", "admin", "re
             raise HTTPException(409, "Only draft quotes may be approved")
         if not hmac.compare_digest(data.snapshot_hash, q["snapshot_hash"]):
             raise HTTPException(409, "Snapshot hash does not match the quote the reviewer saw")
-        c.execute("UPDATE quotes SET status='approved', approved_by=?, approved_at=? WHERE id=?", (u["id"], _now(), quote_id))
+        snapshot = json.loads(q['snapshot_json'])
+        if snapshot_hash(snapshot) != q['snapshot_hash']:
+            raise HTTPException(409, 'Quote snapshot integrity check failed')
+        supplier_check = await supplier_agents.validate_approval(u, snapshot)
+        # No subprocess/model wait occurs under the serialized database write lock.
+        c.execute('BEGIN IMMEDIATE')
+        changed = c.execute("UPDATE quotes SET status='approved', approved_by=?, approved_at=? WHERE id=? AND status='draft' AND snapshot_hash=?", (u["id"], _now(), quote_id, data.snapshot_hash))
+        if changed.rowcount != 1:
+            raise HTTPException(409, 'Quote changed during approval; refresh and review again.')
+        supplier_agents.reserve_credit(c, quote_id, snapshot, supplier_check)
         audit(c, u, "approve", "quote", quote_id, {"created_by": q["created_by"], "snapshot_hash": q["snapshot_hash"]})
     return {"id": quote_id, "status": "approved", "snapshot_hash": q["snapshot_hash"]}
 
@@ -545,8 +561,11 @@ def quote_pdf(quote_id: str, u=Depends(current_user)):
 
 
 # ---------- jobs (the crew) ----------
-def _job_view(row) -> dict:
+def _job_view(row, user=None) -> dict:
     data = json.loads(row["result_json"] or "{}")
+    if user and user['role'] == 'viewer':
+        for key in ['agents', 'questions', 'trace', 'problems', 'flags']:
+            data.pop(key, None)
     return {"id": row["id"], "status": row["status"], "project_name": row["project_name"], "customer_name": row["customer_name"],
             "project_id": row["project_id"], "quote_id": row["quote_id"], "created_at": row["created_at"], **data}
 
@@ -557,11 +576,12 @@ async def create_job(data: JobIn, idempotency_key: str = Header(..., alias="Idem
     with connect() as c:
         existing = c.execute("SELECT * FROM jobs WHERE tenant_id=? AND idempotency_key=?", (u["tenant_id"], idempotency_key)).fetchone()
         if existing:
-            return _job_view(existing)
+            return _job_view(existing, u)
     job = {"id": str(uuid.uuid4()), "notes": data.notes, "project_name": data.project_name,
            "customer_name": data.customer_name, "idempotency_key": idempotency_key, "created_at": _now()}
     try:
-        output = await crew_service.execute(connect, u, job, _policy(data))
+        execute = supplier_agents.execute if data.workflow == 'supplier' else crew_service.execute
+        output = await supplier_agents.claimed_execute(connect, u, job, _policy(data), execute, initial=True)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
     except sqlite3.IntegrityError as exc:
@@ -573,7 +593,7 @@ async def create_job(data: JobIn, idempotency_key: str = Header(..., alias="Idem
 @app.get("/jobs")
 def list_jobs(u=Depends(current_user)):
     with connect() as c:
-        return [_job_view(r) for r in c.execute("SELECT * FROM jobs WHERE tenant_id=? ORDER BY created_at DESC LIMIT 100", (u["tenant_id"],))]
+        return [_job_view(r, u) for r in c.execute("SELECT * FROM jobs WHERE tenant_id=? ORDER BY created_at DESC LIMIT 100", (u["tenant_id"],))]
 
 
 @app.get("/jobs/{job_id}")
@@ -582,7 +602,7 @@ def get_job(job_id: str, u=Depends(current_user)):
         row = c.execute("SELECT * FROM jobs WHERE id=? AND tenant_id=?", (job_id, u["tenant_id"])).fetchone()
     if not row:
         raise HTTPException(404, "Job not found")
-    return _job_view(row)
+    return _job_view(row, u)
 
 
 @app.post("/jobs/{job_id}/answers")
@@ -596,8 +616,11 @@ async def answer_job(job_id: str, data: AnswerIn, u=Depends(role("owner", "admin
     job = dict(row)
     job["notes"] = f"{row['notes']}\nContractor answer: {data.answers}"
     previous = json.loads(row["result_json"] or "{}")
+    if previous.get('workflow') == 'supplier':
+        job['notes'] = data.answers
     try:
-        output = await crew_service.execute(connect, u, job, previous.get("policy", {}) or {})
+        execute = supplier_agents.execute if previous.get('workflow') == 'supplier' else crew_service.execute
+        output = await supplier_agents.claimed_execute(connect, u, job, previous.get("policy", {}) or {}, execute)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
     return {"id": job_id, **output}

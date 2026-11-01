@@ -122,6 +122,13 @@ $("login-form").addEventListener("submit", async (event) => {
 $("logout").addEventListener("click", signOut);
 $("refresh").addEventListener("click", loadAll);
 $("scope-search").addEventListener("input", renderPriceOptions);
+function updateJobHint() {
+  $("job-notes").placeholder = $("job-workflow").value === 'supplier'
+    ? '10 of 2x4x8 SPF studs\n2 sheets of 4x8 half-inch drywall'
+    : 'Replace 40 ft of 3/4in copper pipe, 2 shutoff valves, Friday install';
+}
+$("job-workflow").addEventListener('change', updateJobHint);
+updateJobHint();
 
 // ---------- job from notes ----------
 function renderJob(job) {
@@ -135,6 +142,20 @@ function renderJob(job) {
   if (job.missing && job.missing.length) {
     lines.push(`<p class="small">Not priced: ${job.missing.map((m) => esc(m.name)).join(", ")}</p>`);
   }
+  if (job.agents) {
+    const supplier = job.agents.supplier;
+    if (supplier && supplier.data) {
+      lines.push(`<p><strong>Supplier desk</strong> · ${esc(supplier.data.branch)} ${supplier.data.sample_data ? '<span class="status warn">SAMPLE DATA</span>' : ''}</p>`);
+      lines.push(`<ul>${supplier.data.lines.map(line => `<li>${esc(line.quantity)} ${esc(line.unit)} ${esc(line.item)}${line.unresolved_quantity ? ` — ${esc(line.unresolved_quantity)} unresolved` : ''}</li>`).join('')}</ul>`);
+    }
+    for (const result of job.agents.research || []) {
+      lines.push(`<p><strong>Specification research</strong>: ${esc(result.data?.answer || 'Evidence could not be verified; rep review is required.')}</p>`);
+      for (const source of result.data?.sources || []) {
+        let url; try { url = new URL(source.url); } catch (_) { continue; }
+        if (url.protocol === 'https:') lines.push(`<p class="small"><a href="${esc(url.href)}" target="_blank" rel="noopener noreferrer">Source</a>: ${esc(source.quoted_text)}</p>`);
+      }
+    }
+  }
   if (job.quote) {
     lines.push(`<p>Draft total <span class="amount">${money(job.quote.costs.total)}</span>
       ${job.quote.review_required ? '<span class="status warn">review before sending</span>' : ""}</p>
@@ -143,7 +164,7 @@ function renderJob(job) {
   }
   if (job.status !== "ready") {
     lines.push(`<form id="answer-form" class="quote-lines">
-      <div class="field"><label for="answer-text">Answer the questions</label><textarea id="answer-text" rows="3" maxlength="2000" required></textarea></div>
+      <div class="field"><label for="answer-text">${job.workflow === 'supplier' ? 'Corrected complete materials list (replaces the previous list)' : 'Answer the questions'}</label><textarea id="answer-text" rows="3" maxlength="2000" required></textarea></div>
       <button class="btn primary full" type="submit">Send answer and re-run</button></form>`);
     panel.dataset.jobId = job.id;
   }
@@ -158,6 +179,7 @@ $("job-form").addEventListener("submit", async (event) => {
       method: "POST",
       headers: { "Idempotency-Key": newIdempotencyKey() },
       json: {
+        workflow: $("job-workflow").value,
         notes: $("job-notes").value, project_name: $("job-project").value, customer_name: $("job-customer").value || null,
         overhead_pct: Number($("job-overhead").value) / 100, markup_pct: Number($("job-markup").value) / 100,
       },

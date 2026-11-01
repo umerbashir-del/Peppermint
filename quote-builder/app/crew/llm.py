@@ -5,6 +5,8 @@ from typing import Protocol
 
 import httpx
 
+from app.config import load_config  # importing loads the private root environment
+
 
 class LLMError(Exception):
     pass
@@ -70,7 +72,36 @@ class OpenAICompatibleGateway:
         return data["choices"][0]["message"]["content"]
 
 
+class AnthropicGateway:
+    def __init__(self, api_key, model):
+        self.api_key, self.model = api_key, model
+
+    async def complete(self, slot, prompt_name, system, user, budget):
+        budget.charge_turn()
+        model = os.getenv(f'QBC_MODEL_{slot.upper()}') or self.model
+        try:
+            async with httpx.AsyncClient(timeout=60) as client:
+                response = await client.post('https://api.anthropic.com/v1/messages',
+                    headers={'x-api-key': self.api_key, 'anthropic-version': '2026-10-21'},
+                    json={'model': model, 'max_tokens': 4096, 'system': system,
+                          'messages': [{'role': 'user', 'content': user}]})
+        except httpx.HTTPError:
+            raise LLMError('Anthropic is unreachable') from None
+        if response.status_code != 200:
+            raise LLMError(f'Anthropic returned status {response.status_code}')
+        data = response.json()
+        if data.get('stop_reason') != 'end_turn':
+            raise LLMError('Anthropic did not finish the response')
+        usage = data.get('usage') or {}
+        # Operator-supplied rates are budget estimates, never billing totals.
+        budget.charge_cost(usage.get('input_tokens', 0) * float(os.getenv('QBC_PRICE_IN_PER_MTOK', '5')) / 1e6
+                           + usage.get('output_tokens', 0) * float(os.getenv('QBC_PRICE_OUT_PER_MTOK', '25')) / 1e6)
+        return ''.join(block['text'] for block in data.get('content', []) if block.get('type') == 'text')
+
+
 def gateway_from_env() -> Gateway:
+    if os.getenv('ANTHROPIC_API_KEY') and not os.getenv('QBC_LLM_BASE_URL'):
+        return AnthropicGateway(os.environ['ANTHROPIC_API_KEY'], os.getenv('ANTHROPIC_MODEL', 'claude-sonnet-5-5'))
     base = os.getenv("QBC_LLM_BASE_URL")
     key = os.getenv("QBC_LLM_API_KEY")
     models = {slot: os.getenv(f"QBC_MODEL_{slot.upper()}") for slot in ("strong", "mid", "small")}

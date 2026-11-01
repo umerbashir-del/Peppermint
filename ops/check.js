@@ -7,7 +7,7 @@ async function files(directory) {
   for (const entry of await readdir(directory, { withFileTypes: true })) { const path = join(directory, entry.name); if (entry.isDirectory()) result.push(...await files(path)); else if (entry.name.endsWith('.js')) result.push(path); }
   return result;
 }
-for (const directory of ['src', 'web', 'ops']) for (const path of await files(directory)) execFileSync(process.execPath, ['--check', path], { stdio: 'pipe' });
+for (const directory of ['src', 'web', 'ops', 'quote-builder/web']) for (const path of await files(directory)) execFileSync(process.execPath, ['--check', path], { stdio: 'pipe' });
 const tracked = execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8' }).split('\0').filter(Boolean);
 for (const path of tracked) {
   if (path === '.env' || path.startsWith('output/') || path.startsWith('node_modules/')) throw new Error('Private runtime data is tracked by Git.');

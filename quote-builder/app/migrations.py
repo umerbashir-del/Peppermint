@@ -5,7 +5,9 @@ must be safe on databases created by earlier builds, so columns are added only i
 """
 import sqlite3
 import sys
-from datetime import UTC, datetime
+import json
+from decimal import Decimal
+from datetime import UTC, datetime, timedelta
 
 
 def _columns(con, table):
@@ -101,12 +103,39 @@ def m005_jobs_and_indexes(con):
     """)
 
 
+def m006_supplier_bridge(con):
+    con.executescript("""
+    CREATE TABLE IF NOT EXISTS supplier_snapshots(
+        id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, scope_id TEXT NOT NULL REFERENCES scopes(id),
+        amount_cents INTEGER NOT NULL CHECK(amount_cents>=0), source_json TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS supplier_credit_reservations(
+        quote_id TEXT PRIMARY KEY REFERENCES quotes(id), supplier_id TEXT NOT NULL, account_id TEXT NOT NULL,
+        total_cents INTEGER NOT NULL CHECK(total_cents>=0), expires_at TEXT NOT NULL);
+    CREATE INDEX IF NOT EXISTS supplier_credit_account ON supplier_credit_reservations(supplier_id,account_id);
+    CREATE TABLE IF NOT EXISTS job_claims(
+        tenant_id TEXT NOT NULL, claim_key TEXT NOT NULL, token TEXT NOT NULL, expires_at TEXT NOT NULL,
+        PRIMARY KEY(tenant_id,claim_key));
+    """)
+    # Preserve exposure if upgrading an earlier local integration preview.
+    for row in con.execute("SELECT id,approved_at,snapshot_json FROM quotes WHERE status='approved'").fetchall():
+        snapshot = json.loads(row['snapshot_json'] or '{}')
+        agents = snapshot.get('supplier_agents')
+        if not agents:
+            continue
+        scope = agents.get('supplier_scope') or {'supplier_id': 'pilot-supplier', 'account_id': agents['supplier']['data']['account_id']}
+        approved = datetime.fromisoformat(row['approved_at']).replace(tzinfo=UTC) if row['approved_at'] else datetime.now(UTC)
+        expiry = approved + timedelta(days=snapshot['profile']['valid_until_days'])
+        con.execute('INSERT OR IGNORE INTO supplier_credit_reservations(quote_id,supplier_id,account_id,total_cents,expires_at) VALUES(?,?,?,?,?)',
+                    (row['id'], scope['supplier_id'], scope['account_id'], int(Decimal(snapshot['costs']['total']) * 100), expiry.isoformat()))
+
+
 MIGRATIONS = [
     (1, "base_schema", m001_base),
     (2, "pricing_and_snapshots", m002_pricing_and_snapshots),
     (3, "audit_chain", m003_audit_chain),
     (4, "auth_hardening", m004_auth_hardening),
     (5, "jobs_and_indexes", m005_jobs_and_indexes),
+    (6, 'supplier_bridge', m006_supplier_bridge),
 ]
 
 

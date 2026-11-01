@@ -35,6 +35,11 @@ def _now_utc() -> datetime:
 def resolve_source(c, tenant_id, scope):
     """Returns (unit_cost, source_ref, None) or (None, None, reason). Fails closed on anything unverifiable."""
     kind, sid = scope["source_type"], scope["source_id"]
+    if kind == 'supplier_snapshot':
+        item = c.execute('SELECT * FROM supplier_snapshots WHERE id=? AND tenant_id=? AND scope_id=?', (sid, tenant_id, scope['id'])).fetchone()
+        if not item or scope['unit'] != 'set' or scope['quantity'] != 1:
+            return None, None, 'supplier snapshot does not match this scope'
+        return Decimal(item['amount_cents']) / 100, {'type': 'supplier_snapshot', 'id': item['id']}, None
     if kind == "price_item":
         item = c.execute(
             "SELECT pi.id, pi.name, pi.unit, pi.unit_price, pi.source_row, pl.sha256, pl.uploaded_at "
@@ -66,7 +71,7 @@ def resolve_source(c, tenant_id, scope):
 
 
 def build_quote(c, u, project_id: str, policy: dict, customer_text: dict | None = None,
-                customer: dict | None = None, job_id: str | None = None) -> dict:
+                customer: dict | None = None, job_id: str | None = None, supplier_agents: dict | None = None) -> dict:
     project = c.execute("SELECT * FROM projects WHERE id=? AND tenant_id=?", (project_id, u["tenant_id"])).fetchone()
     if not project:
         raise HTTPException(404, "Project not found")
@@ -137,6 +142,10 @@ def build_quote(c, u, project_id: str, policy: dict, customer_text: dict | None 
         "lines": lines, "customer_text": filled, "costs": costs,
         "review_required": review_required, "warnings": warnings,
     }
+    if supplier_agents is not None:
+        snapshot['supplier_agents'] = supplier_agents
+        if supplier_agents['supplier']['data'].get('sample_data'):
+            warnings.append('SAMPLE SUPPLIER DATA: this is not a live commercial quote.')
     digest = snapshot_hash(snapshot)
     eid = str(uuid.uuid4())
     c.execute("UPDATE quotes SET status='superseded' WHERE project_id=? AND status='draft'", (project_id,))
