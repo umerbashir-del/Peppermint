@@ -38,6 +38,8 @@ Each supplier run permits at most twenty model requests, three research handoffs
 
 ## Verification and remaining limits
 
+Chrome browser testing covers owner/reviewer sign-in, creating a supplier draft, reopening saved questions after reload, correcting the complete list, separate-reviewer approval, rejection, and completed PDF download. The dashboard now loads saved profile values and jobs, prevents repeated submissions while agents run, preserves an idempotency key after a network failure, and displays visible persistent errors. Role-aware controls use `/auth/me`; the server still authorizes every request. Sign-out clears prior job, quote, profile, project, and catalog data before another user signs in.
+
 Tests cover the actual Node parser/supplier behind the Python HTTP API, research routing, exact cents, corrections, tenant isolation, stale-source rejection, approval separation, PDF export, and native Anthropic transport. CI now runs both Python and Node suites. Live verification must use the private local key separately from CI; no secrets are committed.
 
 The Python website still uses its own SQLite store, tenant roles, and approval workflow, with a local approval-exposure ledger. It has not inherited the separate Node pilot's PostgreSQL store or order lifecycle. Run one application process/machine per SQLite database; use a shared database and tested multi-instance admission controls before scaling. It does not reserve stock, publish/send quotes, or place orders. A reliable live supplier feed and domain-approved tax policy remain deployment requirements for real commitments. Research failures remain explicit review questions.

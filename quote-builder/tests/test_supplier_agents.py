@@ -43,6 +43,10 @@ def test_supplier_job_cross_language_quote_approval_and_pdf(client, monkeypatch)
     assert client.post('/quotes', headers=ws['owner'], json={'project_id': job['project_id']}).status_code == 409
     viewer = add_user(client, ws['owner'], 'viewer@tenant.test', 'viewer')
     assert 'agents' not in client.get(f"/jobs/{job['id']}", headers=viewer).json()
+    assert 'notes' not in client.get(f"/jobs/{job['id']}", headers=viewer).json()
+    assert client.get(f"/jobs/{job['id']}", headers=ws['owner']).json()['notes'] == '10 of 2x4x8 SPF studs'
+    assert client.get('/auth/me', headers=reviewer).json()['role'] == 'reviewer'
+    assert client.get('/auth/me').status_code == 401
     assert 'supplier_agents' not in client.get(f"/quotes/{quote['id']}", headers=viewer).json()['snapshot']
     other = workspace(client, tenant='tenant-b')
     assert client.get(f"/jobs/{job['id']}", headers=other['owner']).status_code == 404

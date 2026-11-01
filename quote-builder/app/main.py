@@ -252,6 +252,11 @@ def logout(u=Depends(current_user)):
     return {"ok": True}
 
 
+@app.get('/auth/me')
+def me(u=Depends(current_user)):
+    return u
+
+
 @app.post("/auth/bootstrap")
 def bootstrap(data: BootstrapIn, x_bootstrap_secret: str | None = Header(default=None)):
     """Creates the first owner. Disabled after the first user exists, unless QBC_ALLOW_MULTI_TENANT_BOOTSTRAP=1."""
@@ -563,6 +568,8 @@ def quote_pdf(quote_id: str, u=Depends(current_user)):
 # ---------- jobs (the crew) ----------
 def _job_view(row, user=None) -> dict:
     data = json.loads(row["result_json"] or "{}")
+    if user and user['role'] != 'viewer':
+        data['notes'] = row['notes']
     if user and user['role'] == 'viewer':
         for key in ['agents', 'questions', 'trace', 'problems', 'flags']:
             data.pop(key, None)
