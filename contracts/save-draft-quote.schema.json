@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "save_draft_quote input",
+  "type": "object", "additionalProperties": false,
+  "required": ["save_id", "supplier_result"],
+  "properties": {
+    "save_id": { "type": "string", "pattern": "^[A-Za-z0-9._:-]{1,128}$" },
+    "supplier_result": { "allOf": [{ "$ref": "agent-interface.schema.json#/$defs/result" }, { "properties": { "agent": { "const": "supplier_quote_desk" }, "status": { "enum": ["completed", "needs_human_review"] }, "approval_required": { "const": true } } }] },
+    "research_results": { "type": "array", "maxItems": 100, "items": { "allOf": [{ "$ref": "agent-interface.schema.json#/$defs/result" }, { "properties": { "agent": { "const": "research" } } }] } },
+    "unresolved_questions": { "type": "array", "maxItems": 100, "items": { "type": "object", "additionalProperties": false, "required": ["question", "line_ids"], "properties": { "question": { "type": "string", "minLength": 1, "maxLength": 3000 }, "line_ids": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 128 } } } } }
+  }
+}

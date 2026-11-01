@@ -1,0 +1,8 @@
+{
+  "account_id": "near-limit",
+  "branch": "sample-main",
+  "delivery": null,
+  "lines": [
+    { "line_id": "1", "item": "2x10x12 SPF joists", "quantity": 40, "unit": "each" }
+  ]
+}
