@@ -265,6 +265,7 @@ def test_estimator_claims_outside_its_trade_are_ignored(client, monkeypatch):
 
 
 def test_no_gateway_configured_returns_503(client, monkeypatch):
+    monkeypatch.delenv('ANTHROPIC_API_KEY', raising=False)
     ws = workspace(client)
     monkeypatch.delenv("QBC_LLM_BASE_URL", raising=False)
     monkeypatch.delenv("QBC_LLM_API_KEY", raising=False)

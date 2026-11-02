@@ -50,8 +50,9 @@
   <div class="layout">
     <div>
       <section class="panel">
-        <h2>New job from notes</h2>
+        <h2 id="job-heading">New job from notes</h2>
         <form id="job-form">
+          <div class="field"><label for="job-workflow">Quote source</label><select id="job-workflow"><option value="supplier">Supplier materials and specification research</option><option value="crew">Job estimate from uploaded price list</option></select><p class="small">Supplier mode accepts a materials list, one item per line. Supplier prices, stock, substitutions, and evidence remain subject to review. Labor is excluded.</p></div>
           <div class="field"><label for="job-notes">Job notes</label>
             <textarea id="job-notes" rows="6" required maxlength="8000" placeholder="Replace 40 ft of 3/4in copper pipe, 2 shutoff valves, Friday install"></textarea></div>
           <div class="form-grid">
@@ -63,6 +64,12 @@
           <button class="btn primary full" type="submit">Create draft</button>
         </form>
         <div id="job-result" class="result hidden"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Saved jobs</h2>
+        <p class="small">Reopen a job to review its questions or continue after a refresh.</p>
+        <div class="table-wrap"><table><thead><tr><th>Job</th><th>Status</th><th></th></tr></thead><tbody id="jobs-table"><tr><td colspan="3" class="empty">Sign in to load jobs.</td></tr></tbody></table></div>
       </section>
 
       <section class="panel">

@@ -29,7 +29,8 @@ async function proposeMatches(request, tools, respond) {
     const calls = response.output.filter(item => item.type === 'function_call');
     if (!calls.length) {
       try {
-        const parsed = JSON.parse(outputText(response));
+        const text = outputText(response).trim().replace(/^```(?:json)?\s*([\s\S]*?)\s*```$/i, '$1');
+        const parsed = JSON.parse(text);
         if (!Array.isArray(parsed.matches)) throw new Error();
         return parsed.matches;
       } catch { throw new Error('Supplier agent returned an invalid match proposal. No quote was approved.'); }

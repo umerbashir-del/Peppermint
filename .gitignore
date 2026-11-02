@@ -9,3 +9,7 @@ eval/private/
 backups/
 .pgpass
 .pg_service.conf
+__pycache__/
+.pytest_cache/
+.venv/
+quote_builder.db*

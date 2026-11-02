@@ -64,6 +64,7 @@ def test_turn_budget_is_enforced_before_the_call(monkeypatch):
 
 
 def test_gateway_from_env_requires_every_setting(monkeypatch):
+    monkeypatch.delenv('ANTHROPIC_API_KEY', raising=False)
     for name in ("QBC_LLM_BASE_URL", "QBC_LLM_API_KEY", "QBC_MODEL_STRONG", "QBC_MODEL_MID", "QBC_MODEL_SMALL"):
         monkeypatch.delenv(name, raising=False)
     with pytest.raises(NotConfigured):

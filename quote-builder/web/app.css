@@ -55,6 +55,8 @@ td { padding: 11px 8px; border-bottom: 1px solid var(--line); }
 .notice { display: none; margin: 0 0 16px; padding: 11px 14px; border-radius: 9px; font-size: 13px; }
 .notice.error { display: block; background: #fff0f0; color: var(--danger); }
 .notice.success { display: block; background: #eaf8ef; color: var(--ok); }
+#notice { position: fixed; top: 16px; right: 16px; z-index: 1000; max-width: min(520px, calc(100vw - 32px)); box-shadow: 0 8px 28px #0003; }
+.btn:disabled { opacity: .65; cursor: wait; }
 .small { font-size: 12px; color: var(--muted); line-height: 1.5; }
 .auth { max-width: 460px; margin: 60px auto; padding: 0 16px; }
 .auth .panel { padding: 28px; }

@@ -4,6 +4,10 @@ let token = null;
 let projects = [];
 let quotes = [];
 let priceItems = [];
+let jobs = [];
+let currentUser = null;
+let profileDirty = false;
+let pendingJob = null;
 
 try { token = sessionStorage.getItem("qbc_token"); } catch (_) { token = null; }
 
@@ -21,19 +25,44 @@ function money(value) {
 function notify(el, text, type = "error") {
   el.textContent = text;
   el.className = "notice " + type;
-  setTimeout(() => { if (el.textContent === text) el.className = "notice"; }, 6000);
+  if (type === 'success') setTimeout(() => { if (el.textContent === text) el.className = "notice"; }, 8000);
+}
+
+const canCreate = () => ['owner', 'admin', 'estimator'].includes(currentUser?.role);
+const canManage = () => ['owner', 'admin'].includes(currentUser?.role);
+const canReview = () => ['owner', 'admin', 'reviewer'].includes(currentUser?.role);
+const jobLabel = status => ({ ready: 'Draft ready', needs_input: 'Needs your input', failed: 'Failed — retry' })[status] || status;
+function showError(error) { if (!error.staleSession) notify($("notice"), error.message); }
+function busyForm(form, label) {
+  if (form.dataset.busy) return null;
+  form.dataset.busy = 'true';
+  form.setAttribute('aria-busy', 'true');
+  const controls = [...form.querySelectorAll('button, input, select, textarea')].map(control => [control, control.disabled]);
+  const button = form.querySelector('button[type="submit"]');
+  const text = button.textContent;
+  controls.forEach(([control]) => { control.disabled = true; });
+  button.textContent = label;
+  return () => {
+    controls.forEach(([control, disabled]) => { control.disabled = disabled; });
+    button.textContent = text;
+    delete form.dataset.busy;
+    form.setAttribute('aria-busy', 'false');
+  };
 }
 
 async function api(path, options = {}) {
+  const requestToken = token;
   const headers = { ...(options.headers || {}), Authorization: `Bearer ${token}` };
   if (options.json !== undefined) {
     headers["Content-Type"] = "application/json";
     options.body = JSON.stringify(options.json);
   }
   const response = await fetch(path, { ...options, headers });
+  if (requestToken !== token) throw Object.assign(new Error('Session changed.'), { staleSession: true });
   if (response.status === 401) { signOut(); throw new Error("Your session has ended. Sign in again."); }
   let data = null;
   try { data = await response.json(); } catch (_) { data = null; }
+  if (requestToken !== token) throw Object.assign(new Error('Session changed.'), { staleSession: true });
   if (!response.ok) {
     const detail = data && data.detail;
     const message = typeof detail === "string" ? detail : (detail && detail.message) || `Request failed (${response.status})`;
@@ -51,6 +80,18 @@ function showApp() {
 function signOut() {
   if (token) { fetch("/auth/logout", { method: "POST", headers: { Authorization: `Bearer ${token}` } }).catch(() => {}); }
   token = null;
+  currentUser = null;
+  projects = []; quotes = []; priceItems = []; jobs = [];
+  profileDirty = false; pendingJob = null;
+  for (const id of ['job-form', 'profile-form', 'scope-form']) $(id).reset();
+  for (const id of ['job-result', 'quote-body', 'quotes-table', 'projects-table', 'jobs-table', 'price-result', 'scope-project', 'scope-price']) $(id).innerHTML = '';
+  delete $('job-result').dataset.jobId;
+  $('price-file').value = '';
+  $('job-result').classList.add('hidden');
+  $('quote-detail').classList.add('hidden');
+  $('notice').className = 'notice';
+  $('auth-notice').className = 'notice';
+  for (const id of ['project-count', 'review-count', 'approved-count']) $(id).textContent = '-';
   try { sessionStorage.removeItem("qbc_token"); } catch (_) { /* storage may be blocked */ }
   $("app-view").classList.add("hidden");
   $("auth-view").classList.remove("hidden");
@@ -58,11 +99,23 @@ function signOut() {
 }
 
 async function loadAll() {
+  const loadToken = token;
   try {
-    [projects, quotes, priceItems] = await Promise.all([api("/projects"), api("/quotes"), api("/price-items?limit=200")]);
+    const values = await Promise.all([api('/projects'), api('/quotes'), api('/price-items?limit=200'), api('/jobs'), api('/profile'), api('/auth/me')]);
+    if (loadToken !== token) return;
+    [projects, quotes, priceItems, jobs] = values;
+    const profile = values[4]; currentUser = values[5];
+    if (!profileDirty) {
+      for (const [id, value] of Object.entries({ 'p-license': profile.license_number || '', 'p-insurance': profile.insurance_text || '', 'p-terms': profile.payment_terms || '', 'p-rate': profile.labor_rate ?? '', 'p-days': profile.valid_until_days ?? 30 })) $(id).value = value;
+    }
+    $('job-form').classList.toggle('hidden', !canCreate());
+    $('job-heading').textContent = canCreate() ? 'New job from notes' : 'Job details';
+    $('scope-form').closest('section').classList.toggle('hidden', !canCreate());
+    $('price-upload').closest('section').classList.toggle('hidden', !canManage());
+    $('profile-form').querySelectorAll('input, button').forEach(control => { control.disabled = !canManage(); });
     render();
   } catch (err) {
-    notify($("notice"), err.message);
+    showError(err);
   }
 }
 
@@ -84,6 +137,8 @@ function render() {
   $("projects-table").innerHTML = projects.length
     ? projects.map((p) => `<tr><td>${esc(p.name)}</td><td class="small">${esc(p.created_at)}</td></tr>`).join("")
     : '<tr><td colspan="2" class="empty">No projects yet.</td></tr>';
+  $('jobs-table').innerHTML = jobs.length ? jobs.map(job => `<tr><td>${esc(job.project_name)}</td><td>${esc(jobLabel(job.status))}</td><td><button class="btn secondary" data-open-job="${esc(job.id)}">Open job</button></td></tr>`).join('')
+    : '<tr><td colspan="3" class="empty">No saved jobs yet.</td></tr>';
   const options = projects.map((p) => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join("");
   $("scope-project").innerHTML = options || '<option value="">Create a project first</option>';
   renderPriceOptions();
@@ -122,18 +177,40 @@ $("login-form").addEventListener("submit", async (event) => {
 $("logout").addEventListener("click", signOut);
 $("refresh").addEventListener("click", loadAll);
 $("scope-search").addEventListener("input", renderPriceOptions);
+$('profile-form').addEventListener('input', () => { profileDirty = true; });
+function updateJobHint() {
+  $("job-notes").placeholder = $("job-workflow").value === 'supplier'
+    ? '10 of 2x4x8 SPF studs\n2 sheets of 4x8 half-inch drywall'
+    : 'Replace 40 ft of 3/4in copper pipe, 2 shutoff valves, Friday install';
+}
+$("job-workflow").addEventListener('change', updateJobHint);
+updateJobHint();
 
 // ---------- job from notes ----------
 function renderJob(job) {
   const panel = $("job-result");
   const lines = [];
   lines.push(`<p><span class="status ${job.status === "ready" ? "ok" : "warn"}">${esc(job.status)}</span>
-    ${job.failed_half ? `<span class="small">half that failed: ${esc(job.failed_half)}</span>` : ""}</p>`);
+    ${job.failed_half ? `<span class="small">Step that failed: ${esc(job.failed_half)}</span>` : ""}</p>`);
   if (job.questions && job.questions.length) {
     lines.push(`<p><strong>Questions for you</strong></p><ul>${job.questions.map((q) => `<li>${esc(q)}</li>`).join("")}</ul>`);
   }
   if (job.missing && job.missing.length) {
     lines.push(`<p class="small">Not priced: ${job.missing.map((m) => esc(m.name)).join(", ")}</p>`);
+  }
+  if (job.agents) {
+    const supplier = job.agents.supplier;
+    if (supplier && supplier.data) {
+      lines.push(`<p><strong>Supplier desk</strong> · ${esc(supplier.data.branch)} ${supplier.data.sample_data ? '<span class="status warn">SAMPLE DATA</span>' : ''}</p>`);
+      lines.push(`<ul>${supplier.data.lines.map(line => `<li>${esc(line.quantity)} ${esc(line.unit)} ${esc(line.item)}${line.unresolved_quantity ? ` — ${esc(line.unresolved_quantity)} unresolved` : ''}</li>`).join('')}</ul>`);
+    }
+    for (const result of job.agents.research || []) {
+      lines.push(`<p><strong>Specification research</strong>: ${esc(result.data?.answer || 'Evidence could not be verified; rep review is required.')}</p>`);
+      for (const source of result.data?.sources || []) {
+        let url; try { url = new URL(source.url); } catch (_) { continue; }
+        if (url.protocol === 'https:') lines.push(`<p class="small"><a href="${esc(url.href)}" target="_blank" rel="noopener noreferrer">Source</a>: ${esc(source.quoted_text)}</p>`);
+      }
+    }
   }
   if (job.quote) {
     lines.push(`<p>Draft total <span class="amount">${money(job.quote.costs.total)}</span>
@@ -141,9 +218,9 @@ function renderJob(job) {
       <p class="mono">snapshot ${esc(job.quote.snapshot_hash)}</p>
       <button class="btn primary" data-open="${esc(job.quote.id)}">Open for review</button>`);
   }
-  if (job.status !== "ready") {
+  if (job.status !== "ready" && canCreate()) {
     lines.push(`<form id="answer-form" class="quote-lines">
-      <div class="field"><label for="answer-text">Answer the questions</label><textarea id="answer-text" rows="3" maxlength="2000" required></textarea></div>
+      <div class="field"><label for="answer-text">${job.workflow === 'supplier' ? 'Corrected complete materials list (replaces the previous list)' : 'Answer the questions'}</label><textarea id="answer-text" rows="3" maxlength="2000" required></textarea></div>
       <button class="btn primary full" type="submit">Send answer and re-run</button></form>`);
     panel.dataset.jobId = job.id;
   }
@@ -153,34 +230,45 @@ function renderJob(job) {
 
 $("job-form").addEventListener("submit", async (event) => {
   event.preventDefault();
+  const restore = busyForm(event.target, 'Creating draft…');
+  if (!restore) return;
   try {
+    const input = {
+      workflow: $('job-workflow').value, notes: $('job-notes').value,
+      project_name: $('job-project').value, customer_name: $('job-customer').value || null,
+      overhead_pct: Number($('job-overhead').value) / 100, markup_pct: Number($('job-markup').value) / 100,
+    };
+    const signature = JSON.stringify([token, input]);
+    if (pendingJob?.signature !== signature) pendingJob = { signature, key: newIdempotencyKey() };
     const job = await api("/jobs", {
       method: "POST",
-      headers: { "Idempotency-Key": newIdempotencyKey() },
-      json: {
-        notes: $("job-notes").value, project_name: $("job-project").value, customer_name: $("job-customer").value || null,
-        overhead_pct: Number($("job-overhead").value) / 100, markup_pct: Number($("job-markup").value) / 100,
-      },
+      headers: { "Idempotency-Key": pendingJob.key }, json: input,
     });
+    pendingJob = null;
     renderJob(job);
     await loadAll();
-    notify($("notice"), job.status === "ready" ? "Draft quote created for review." : "The crew needs answers before it can draft a quote.", job.status === "ready" ? "success" : "error");
+    notify($("notice"), job.status === "ready" ? "Draft quote created for review." : job.status === 'failed' ? 'An agent could not finish. Review the job details and retry.' : "Review the questions below before drafting.", job.status === "ready" ? "success" : "error");
+    $('job-result').scrollIntoView({ behavior: 'smooth', block: 'center' });
   } catch (err) {
-    notify($("notice"), err.message);
-  }
+    showError(err);
+  } finally { restore(); }
 });
 
 $("job-result").addEventListener("submit", async (event) => {
   if (event.target.id !== "answer-form") return;
   event.preventDefault();
+  const restore = busyForm(event.target, 'Updating job…');
+  if (!restore) return;
   try {
     const jobId = $("job-result").dataset.jobId;
-    const job = await api(`/jobs/${encodeURIComponent(jobId)}/answers`, { method: "POST", json: { answers: $("answer-text").value } });
+    const answers = $("answer-text").value;
+    const job = await api(`/jobs/${encodeURIComponent(jobId)}/answers`, { method: "POST", json: { answers } });
+    if (job.workflow === 'supplier') $('job-notes').value = answers;
     renderJob(job);
     await loadAll();
   } catch (err) {
-    notify($("notice"), err.message);
-  }
+    showError(err);
+  } finally { restore(); }
 });
 
 // ---------- quote review ----------
@@ -192,7 +280,7 @@ async function openQuote(id) {
   const rows = text.lines_text ? text.lines_text.map((l) => `<li>${esc(l)}</li>`).join("")
     : (snap.lines || []).map((l) => `<li>${esc(l.description)}: ${money(l.line_total)} direct cost</li>`).join("");
   const warnings = (snap.warnings || []).map((w) => `<li>${esc(w)}</li>`).join("");
-  const reviewable = q.status === "draft";
+  const reviewable = q.status === 'draft' && canReview() && q.created_by !== currentUser?.id && data.snapshot_verified;
   $("quote-body").innerHTML = `
     <p><strong>${esc(projectName(q.project_id))}</strong> · version ${esc(q.version)} ·
       <span class="status ${q.status === "approved" ? "ok" : "warn"}">${esc(q.status)}</span>
@@ -210,7 +298,8 @@ async function openQuote(id) {
       <form id="reject-form"><div class="field"><label for="reject-reason">Reason for rejecting (3+ characters)</label>
         <input id="reject-reason" required minlength="3" maxlength="2000"></div>
         <button class="btn danger" type="submit" data-reject="${esc(q.id)}">Reject draft</button></form></div>` : ""}
-    ${q.status === "approved" ? `<button class="btn secondary" data-pdf="${esc(q.id)}">Download approved PDF</button>` : ""}
+    ${q.status === 'draft' && q.created_by === currentUser?.id ? '<p class="small">A different authorized reviewer must approve this draft.</p>' : ''}
+    ${q.status === "approved" && data.snapshot_verified ? `<button class="btn secondary" data-pdf="${esc(q.id)}">Download approved PDF</button>` : ""}
   `;
   $("quote-detail").classList.remove("hidden");
   $("quote-detail").scrollIntoView({ behavior: "smooth", block: "start" });
@@ -220,6 +309,18 @@ document.addEventListener("click", async (event) => {
   const target = event.target.closest("button");
   if (!target) return;
   try {
+    if (target.dataset.openJob) {
+      const job = await api(`/jobs/${encodeURIComponent(target.dataset.openJob)}`);
+      $('job-workflow').value = job.workflow || 'crew';
+      $('job-notes').value = job.notes || '';
+      $('job-project').value = job.project_name;
+      $('job-customer').value = job.customer_name || '';
+      $('job-overhead').value = Number(job.policy?.overhead_pct || 0) * 100;
+      $('job-markup').value = Number(job.policy?.markup_pct || 0) * 100;
+      updateJobHint(); renderJob(job);
+      $('job-result').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
     if (target.dataset.open) return await openQuote(target.dataset.open);
     if (target.dataset.approve) {
       await api(`/quotes/${encodeURIComponent(target.dataset.approve)}/approve`, { method: "POST", json: { snapshot_hash: target.dataset.hash } });
@@ -285,6 +386,7 @@ $("profile-form").addEventListener("submit", async (event) => {
         payment_terms: $("p-terms").value || null, labor_rate: Number($("p-rate").value), valid_until_days: Number($("p-days").value),
       },
     });
+    profileDirty = false;
     notify($("notice"), "Profile saved.", "success");
   } catch (err) {
     notify($("notice"), err.message);
