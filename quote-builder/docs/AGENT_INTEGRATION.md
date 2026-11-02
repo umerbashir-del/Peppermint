@@ -4,6 +4,8 @@ The website has two quote sources. **Supplier materials and specification resear
 
 ## Start
 
+For hosted frontend/backend setup, see [Vercel and Render deployment](VERCEL_RENDER.md).
+
 Use Node 24+ and Python 3.11+. From the repository root, create a Python virtual environment, install `quote-builder/requirements-dev.txt`, run `npm ci`, then run:
 
 ```text

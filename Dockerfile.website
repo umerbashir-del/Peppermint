@@ -1,0 +1,27 @@
+# Build from the repository root: the Python API launches the Node agents.
+FROM node:24-bookworm-slim AS node-dependencies
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --omit=dev && npm cache clean --force
+
+FROM python:3.11-slim-bookworm AS website
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates libstdc++6 libatomic1 \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --gid 10001 app && useradd --uid 10001 --gid app --create-home app
+COPY --from=node-dependencies /usr/local/bin/node /usr/local/bin/node
+WORKDIR /app
+COPY quote-builder/requirements.txt /app/quote-builder/requirements.txt
+RUN pip install --no-cache-dir -r quote-builder/requirements.txt
+COPY --from=node-dependencies /app/node_modules ./node_modules
+COPY package*.json ./
+COPY src ./src
+COPY data ./data
+COPY quote-builder/app ./quote-builder/app
+COPY quote-builder/web ./quote-builder/web
+COPY quote-builder/start.py ./quote-builder/start.py
+ENV NODE_ENV=production PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 \
+    PORT=10000 QBC_DB_PATH=/var/data/quote_builder.db QBC_CONTAINER_USER=app
+# start.py prepares the mounted directory, then drops root before starting the API.
+EXPOSE 10000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s CMD python -c "import os,urllib.request; urllib.request.urlopen('http://127.0.0.1:'+os.environ.get('PORT','10000')+'/ready',timeout=4)"
+CMD ["python", "quote-builder/start.py"]

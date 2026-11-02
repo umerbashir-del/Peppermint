@@ -31,7 +31,7 @@ async function browser(extra = {}) {
   const response = body => ({ status: 200, ok: true, json: async () => body });
   const context = { document: { getElementById: get, addEventListener: (name, fn) => { events[name] = fn; } },
     sessionStorage: { getItem: k => storage.get(k), setItem: (k,v) => storage.set(k,v), removeItem: k => storage.delete(k) },
-    crypto: webcrypto, window: { crypto: webcrypto }, URL, setTimeout: fn => timers.push(fn),
+    crypto: webcrypto, window: { crypto: webcrypto, QBC_CONFIG: extra.config }, URL, setTimeout: fn => timers.push(fn),
     fetch: async (path, options = {}) => { calls.push({ path, options }); return extra.fetch ? extra.fetch(path, options, response, routes) : response(routes[path] || {}); } };
   runInNewContext(script, context);
   await tick(); await tick();
@@ -86,4 +86,28 @@ test('sign-out removes private job, quote, and profile data before the next user
   assert.equal(page.get('scope-project').innerHTML, '');
   assert.equal(page.get('scope-price').innerHTML, '');
   assert.equal(page.get('app-view').classList.contains('hidden'), true);
+});
+
+test('split-host frontend routes authenticated requests, sign-in, uploads, PDFs, and logout to its backend', async () => {
+  const origin = 'https://buildbridge-api.example';
+  const page = await browser({ config: { apiBaseUrl: origin }, fetch: (url, options, response, routes) => {
+    assert.ok(url.startsWith(origin + '/'));
+    const path = url.slice(origin.length);
+    if (path === '/auth/login') return response({ access_token: 'session-B' });
+    if (path === '/price-lists') return response({ accepted: 1, rejected: [] });
+    if (path.endsWith('/pdf')) return { ok: false }; // Exercise the destination without creating a browser download.
+    return response(routes[path] || {});
+  } });
+  await page.get('login-form').listeners.submit({ preventDefault() {}, submitter: element('login') });
+  await tick(); await tick();
+  page.get('price-file').files = [{ text: async () => 'name,unit,unit_price\nstud,ea,4.20' }];
+  await page.get('price-upload').listeners.click();
+  const pdf = { dataset: { pdf: 'approved-quote' }, closest() { return this; } };
+  await page.events.click({ target: pdf });
+  page.get('logout').listeners.click();
+  for (const path of ['/projects', '/jobs', '/auth/me', '/auth/login', '/price-lists', '/quotes/approved-quote/pdf', '/auth/logout']) {
+    assert.ok(page.calls.some(call => call.path === origin + path), path);
+  }
+  assert.equal(page.calls.find(call => call.path.endsWith('/price-lists')).options.headers.Authorization, 'Bearer session-B');
+  assert.equal(page.calls.find(call => call.path.endsWith('/pdf')).options.headers.Authorization, 'Bearer session-B');
 });

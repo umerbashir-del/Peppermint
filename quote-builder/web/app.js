@@ -1,5 +1,10 @@
 "use strict";
 const $ = (id) => document.getElementById(id);
+const apiBaseUrl = window.QBC_CONFIG?.apiBaseUrl || '';
+function apiUrl(path) {
+  if (!path.startsWith('/') || path.startsWith('//')) throw new Error('Invalid API path');
+  return apiBaseUrl + path;
+}
 let token = null;
 let projects = [];
 let quotes = [];
@@ -57,7 +62,7 @@ async function api(path, options = {}) {
     headers["Content-Type"] = "application/json";
     options.body = JSON.stringify(options.json);
   }
-  const response = await fetch(path, { ...options, headers });
+  const response = await fetch(apiUrl(path), { ...options, headers });
   if (requestToken !== token) throw Object.assign(new Error('Session changed.'), { staleSession: true });
   if (response.status === 401) { signOut(); throw new Error("Your session has ended. Sign in again."); }
   let data = null;
@@ -78,7 +83,7 @@ function showApp() {
   loadAll();
 }
 function signOut() {
-  if (token) { fetch("/auth/logout", { method: "POST", headers: { Authorization: `Bearer ${token}` } }).catch(() => {}); }
+  if (token) { fetch(apiUrl("/auth/logout"), { method: "POST", headers: { Authorization: `Bearer ${token}` } }).catch(() => {}); }
   token = null;
   currentUser = null;
   projects = []; quotes = []; priceItems = []; jobs = [];
@@ -158,7 +163,7 @@ $("login-form").addEventListener("submit", async (event) => {
   const button = event.submitter;
   button.disabled = true;
   try {
-    const response = await fetch("/auth/login", {
+    const response = await fetch(apiUrl("/auth/login"), {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ tenant_id: $("tenant").value, email: $("email").value, password: $("password").value }),
     });
@@ -329,7 +334,7 @@ document.addEventListener("click", async (event) => {
       return openQuote(target.dataset.approve);
     }
     if (target.dataset.pdf) {
-      const response = await fetch(`/quotes/${encodeURIComponent(target.dataset.pdf)}/pdf`, { headers: { Authorization: `Bearer ${token}` } });
+      const response = await fetch(apiUrl(`/quotes/${encodeURIComponent(target.dataset.pdf)}/pdf`), { headers: { Authorization: `Bearer ${token}` } });
       if (!response.ok) throw new Error("PDF export was refused. Check that the snapshot is verified.");
       const url = URL.createObjectURL(await response.blob());
       const link = document.createElement("a");
@@ -365,7 +370,7 @@ $("price-upload").addEventListener("click", async () => {
   if (!file) { notify($("notice"), "Choose a CSV file first."); return; }
   try {
     const body = await file.text();
-    const response = await fetch("/price-lists", { method: "POST", headers: { "Content-Type": "text/csv", Authorization: `Bearer ${token}` }, body });
+    const response = await fetch(apiUrl("/price-lists"), { method: "POST", headers: { "Content-Type": "text/csv", Authorization: `Bearer ${token}` }, body });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(typeof data.detail === "string" ? data.detail : (data.detail && data.detail.message) || "Upload failed");
     $("price-result").textContent = `Accepted ${data.accepted} rows. Rejected ${data.rejected.length}.`;

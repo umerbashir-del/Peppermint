@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: buildbridge-api
+    runtime: docker
+    plan: 1c-2g
+    dockerfilePath: ./Dockerfile.website
+    dockerContext: .
+    numInstances: 1
+    autoDeployTrigger: checksPass
+    healthCheckPath: /ready
+    maxShutdownDelaySeconds: 240
+    disk:
+      name: buildbridge-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: QBC_DB_PATH
+        value: /var/data/quote_builder.db
+      - key: QBC_SECRET_KEY
+        generateValue: true
+      - key: QBC_BOOTSTRAP_SECRET
+        generateValue: true
+      - key: QBC_ALLOW_MULTI_TENANT_BOOTSTRAP
+        value: "0"
+      - key: QBC_ALLOW_SAMPLE_SUPPLIER
+        value: "false"
+      - key: QBC_SUPPLIER_BINDINGS_FILE
+        value: /etc/secrets/supplier-bindings.json
+      - key: QBC_CORS_ORIGINS
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ANTHROPIC_MODEL
+        sync: false

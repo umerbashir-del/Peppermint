@@ -21,6 +21,7 @@ from app.audit import audit, verify_chain
 from app.catalog import MAX_BYTES, UNITS, parse_price_csv
 from app.crew import service as crew_service
 from app import supplier_agents
+from app.config import cors_origins
 from app.db import connect, init_db
 from app.logging_setup import configure
 from app.money import cents
@@ -44,7 +45,7 @@ async def lifespan(app):
 
 
 app = FastAPI(title="Quote Builder Crew API", version="2.0.0", lifespan=lifespan)
-_origins = [o.strip() for o in os.getenv("QBC_CORS_ORIGINS", "").split(",") if o.strip()]
+_origins = cors_origins(os.getenv("QBC_CORS_ORIGINS", ""))
 if _origins:
     app.add_middleware(CORSMiddleware, allow_origins=_origins, allow_credentials=False,
                        allow_methods=["GET", "POST", "PUT", "PATCH"], allow_headers=["Authorization", "Content-Type", "Idempotency-Key"])

@@ -14,10 +14,18 @@ jobs:
       - uses: actions/setup-python@v6
         with: {python-version: '3.11', cache: pip, cache-dependency-path: quote-builder/requirements*.txt}
       - run: npm ci
+      - name: Build the standalone Vercel frontend
+        run: node quote-builder/web/build.mjs
+        env:
+          QBC_PUBLIC_API_BASE_URL: https://backend.example.com
       - run: python -m pip install -r quote-builder/requirements-dev.txt
       - run: python -m pytest quote-builder/tests -q
         env:
           PYTHONDONTWRITEBYTECODE: '1'
+      - name: Build the Render website image
+        run: docker build -f Dockerfile.website -t buildbridge-website-check .
+      - name: Check website startup, agent runtime, and restart persistence
+        run: node ops/check-website-container.mjs buildbridge-website-check
   test:
     runs-on: ubuntu-latest
     services:

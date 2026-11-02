@@ -13,3 +13,5 @@ __pycache__/
 .pytest_cache/
 .venv/
 quote_builder.db*
+quote-builder/web/dist/
+.vercel/

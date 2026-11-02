@@ -2,6 +2,8 @@
 
 The Python quote-builder website now connects to the existing supplier and research agents and loads the root `.env` Anthropic key. See [website agent setup](quote-builder/docs/AGENT_INTEGRATION.md) for port-8000 startup, scoped supplier bindings, and review rules. The port-3000 Node pilot remains a separate service.
 
+For hosting, see [Vercel frontend and Render backend setup](quote-builder/docs/VERCEL_RENDER.md). Use `Dockerfile.website` for the Python website and its Node agents; root `Dockerfile` runs the separate Node pilot.
+
 ## Pilot service: sign-in, permissions, and quote review
 
 The integration branch now includes an authenticated quote desk and PostgreSQL-backed review workflow. Your partner's orchestrator is still independent. Requires **Node.js 24+**.

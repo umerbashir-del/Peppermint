@@ -8,3 +8,11 @@ eval/private
 raw
 wiki
 *.log
+**/__pycache__
+**/.pytest_cache
+**/.venv
+**/dist
+.vercel
+**/*.db
+**/*.db-*
+backups
