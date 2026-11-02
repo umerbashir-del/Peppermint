@@ -86,6 +86,7 @@ function signOut() {
   if (token) { fetch(apiUrl("/auth/logout"), { method: "POST", headers: { Authorization: `Bearer ${token}` } }).catch(() => {}); }
   token = null;
   currentUser = null;
+  $('workspace-name').textContent = 'Construction quote desk';
   projects = []; quotes = []; priceItems = []; jobs = [];
   profileDirty = false; pendingJob = null;
   for (const id of ['job-form', 'profile-form', 'scope-form']) $(id).reset();
@@ -110,11 +111,12 @@ async function loadAll() {
     if (loadToken !== token) return;
     [projects, quotes, priceItems, jobs] = values;
     const profile = values[4]; currentUser = values[5];
+    $('workspace-name').textContent = currentUser.tenant_id;
     if (!profileDirty) {
       for (const [id, value] of Object.entries({ 'p-license': profile.license_number || '', 'p-insurance': profile.insurance_text || '', 'p-terms': profile.payment_terms || '', 'p-rate': profile.labor_rate ?? '', 'p-days': profile.valid_until_days ?? 30 })) $(id).value = value;
     }
     $('job-form').classList.toggle('hidden', !canCreate());
-    $('job-heading').textContent = canCreate() ? 'New job from notes' : 'Job details';
+    $('job-heading').textContent = canCreate() ? 'New quote' : 'Job details';
     $('scope-form').closest('section').classList.toggle('hidden', !canCreate());
     $('price-upload').closest('section').classList.toggle('hidden', !canManage());
     $('profile-form').querySelectorAll('input, button').forEach(control => { control.disabled = !canManage(); });
@@ -180,11 +182,17 @@ $("login-form").addEventListener("submit", async (event) => {
   }
 });
 $("logout").addEventListener("click", signOut);
+$('settings-link').addEventListener('click', () => { $('workspace-settings').open = true; });
 $("refresh").addEventListener("click", loadAll);
 $("scope-search").addEventListener("input", renderPriceOptions);
 $('profile-form').addEventListener('input', () => { profileDirty = true; });
 function updateJobHint() {
-  $("job-notes").placeholder = $("job-workflow").value === 'supplier'
+  const supplier = $("job-workflow").value === 'supplier';
+  $('job-notes-label').textContent = supplier ? 'Materials list' : 'Job description';
+  $('workflow-help').textContent = supplier
+    ? 'One material per line. Prices and availability are checked against your supplier account. Labor is excluded.'
+    : 'Estimate materials and labor from the job notes using your uploaded price list.';
+  $("job-notes").placeholder = supplier
     ? '10 of 2x4x8 SPF studs\n2 sheets of 4x8 half-inch drywall'
     : 'Replace 40 ft of 3/4in copper pipe, 2 shutoff valves, Friday install';
 }
@@ -195,7 +203,7 @@ updateJobHint();
 function renderJob(job) {
   const panel = $("job-result");
   const lines = [];
-  lines.push(`<p><span class="status ${job.status === "ready" ? "ok" : "warn"}">${esc(job.status)}</span>
+  lines.push(`<p><span class="status ${job.status === "ready" ? "ok" : "warn"}">${esc(jobLabel(job.status))}</span>
     ${job.failed_half ? `<span class="small">Step that failed: ${esc(job.failed_half)}</span>` : ""}</p>`);
   if (job.questions && job.questions.length) {
     lines.push(`<p><strong>Questions for you</strong></p><ul>${job.questions.map((q) => `<li>${esc(q)}</li>`).join("")}</ul>`);
@@ -220,7 +228,7 @@ function renderJob(job) {
   if (job.quote) {
     lines.push(`<p>Draft total <span class="amount">${money(job.quote.costs.total)}</span>
       ${job.quote.review_required ? '<span class="status warn">review before sending</span>' : ""}</p>
-      <p class="mono">snapshot ${esc(job.quote.snapshot_hash)}</p>
+      <details class="record-details"><summary>Quote record</summary><p class="mono">Revision ID: ${esc(job.quote.snapshot_hash)}</p></details>
       <button class="btn primary" data-open="${esc(job.quote.id)}">Open for review</button>`);
   }
   if (job.status !== "ready" && canCreate()) {
@@ -289,7 +297,7 @@ async function openQuote(id) {
   $("quote-body").innerHTML = `
     <p><strong>${esc(projectName(q.project_id))}</strong> · version ${esc(q.version)} ·
       <span class="status ${q.status === "approved" ? "ok" : "warn"}">${esc(q.status)}</span>
-      ${data.snapshot_verified ? '<span class="status ok">snapshot verified</span>' : '<span class="status warn">snapshot NOT verified</span>'}</p>
+      ${data.snapshot_verified ? '<span class="status ok">revision checked</span>' : '<span class="status warn">revision could not be verified</span>'}</p>
     ${warnings ? `<ul class="small">${warnings}</ul>` : ""}
     <div class="quote-lines"><ul>${rows}</ul>
       ${text.total_text ? `<p>${esc(text.total_text)}</p>` : ""}
@@ -297,9 +305,9 @@ async function openQuote(id) {
       ${text.assumptions && text.assumptions.length ? `<p class="small">Assumptions: ${text.assumptions.map(esc).join("; ")}</p>` : ""}
       ${text.exclusions && text.exclusions.length ? `<p class="small">Exclusions: ${text.exclusions.map(esc).join("; ")}</p>` : ""}
     </div>
-    <p class="mono">snapshot ${esc(q.snapshot_hash)}</p>
+    <details class="record-details"><summary>Quote record</summary><p class="mono">Revision ID: ${esc(q.snapshot_hash)}</p></details>
     ${reviewable ? `<div class="actions">
-      <button class="btn primary" data-approve="${esc(q.id)}" data-hash="${esc(q.snapshot_hash)}">Approve this exact snapshot</button>
+      <button class="btn primary" data-approve="${esc(q.id)}" data-hash="${esc(q.snapshot_hash)}">Approve this revision</button>
       <form id="reject-form"><div class="field"><label for="reject-reason">Reason for rejecting (3+ characters)</label>
         <input id="reject-reason" required minlength="3" maxlength="2000"></div>
         <button class="btn danger" type="submit" data-reject="${esc(q.id)}">Reject draft</button></form></div>` : ""}

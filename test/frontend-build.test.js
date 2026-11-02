@@ -10,7 +10,7 @@ test('static build publishes only website assets and the backend origin with a r
   const outputDirectory = await mkdtemp(join(tmpdir(), 'buildbridge-frontend-'));
   await buildFrontend({ apiBaseUrl: 'https://api.example.com/', outputDirectory });
   assert.deepEqual((await readdir(outputDirectory)).sort(), ['index.html', 'static']);
-  assert.deepEqual((await readdir(join(outputDirectory, 'static'))).sort(), ['app.css', 'app.js', 'config.js']);
+  assert.deepEqual((await readdir(join(outputDirectory, 'static'))).sort(), ['app.css', 'app.js', 'config.js', 'favicon.svg']);
   const context = { window: {} };
   const config = await readFile(join(outputDirectory, 'static/config.js'), 'utf8');
   runInNewContext(config, context);

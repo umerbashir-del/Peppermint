@@ -83,9 +83,25 @@ test('sign-out removes private job, quote, and profile data before the next user
   assert.equal(page.get('job-result').innerHTML, '');
   assert.equal(page.get('quote-body').innerHTML, '');
   assert.equal(page.get('p-rate').value, '');
+  assert.equal(page.get('workspace-name').textContent, 'Construction quote desk');
   assert.equal(page.get('scope-project').innerHTML, '');
   assert.equal(page.get('scope-price').innerHTML, '');
   assert.equal(page.get('app-view').classList.contains('hidden'), true);
+});
+
+test('settings navigation reveals the form and pricing source explains the selected workflow', async () => {
+  const page = await browser();
+  assert.equal(page.get('workspace-name').textContent, 'a');
+  page.get('settings-link').listeners.click();
+  assert.equal(page.get('workspace-settings').open, true);
+  page.get('job-workflow').value = 'crew';
+  page.get('job-workflow').listeners.change();
+  assert.equal(page.get('job-notes-label').textContent, 'Job description');
+  assert.match(page.get('workflow-help').textContent, /uploaded price list/);
+  page.get('job-workflow').value = 'supplier';
+  page.get('job-workflow').listeners.change();
+  assert.equal(page.get('job-notes-label').textContent, 'Materials list');
+  assert.match(page.get('workflow-help').textContent, /Labor is excluded/);
 });
 
 test('split-host frontend routes authenticated requests, sign-in, uploads, PDFs, and logout to its backend', async () => {

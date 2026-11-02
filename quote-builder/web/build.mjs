@@ -17,13 +17,13 @@ export async function buildFrontend({ apiBaseUrl = process.env.QBC_PUBLIC_API_BA
   const origin = backendOrigin(apiBaseUrl);
   const staticDirectory = join(outputDirectory, 'static');
   await mkdir(staticDirectory, { recursive: true });
-  const allowed = new Set(['app.js', 'app.css', 'config.js']);
+  const allowed = new Set(['app.js', 'app.css', 'config.js', 'favicon.svg']);
   if ((await readdir(outputDirectory)).some(file => !['index.html', 'static'].includes(file))
       || (await readdir(staticDirectory)).some(file => !allowed.has(file))) {
     throw new Error('Unexpected files in frontend output. Use a clean output directory before publishing.');
   }
   // An explicit allowlist keeps source files, .env values, and build tools out of the public site.
-  for (const file of ['app.js', 'app.css']) await writeFile(join(staticDirectory, file), await readFile(join(source, file)));
+  for (const file of ['app.js', 'app.css', 'favicon.svg']) await writeFile(join(staticDirectory, file), await readFile(join(source, file)));
   const html = (await readFile(join(source, 'index.html'), 'utf8')).replace("connect-src 'self'", `connect-src 'self' ${origin}`);
   await writeFile(join(outputDirectory, 'index.html'), html);
   await writeFile(join(staticDirectory, 'config.js'), `window.QBC_CONFIG = Object.freeze(${JSON.stringify({ apiBaseUrl: origin })});\n`);

@@ -4,139 +4,89 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'self'">
-  <meta name="theme-color" content="#15263d">
-  <title>Quote Builder Crew</title>
+  <meta name="theme-color" content="#f5f3ed">
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <title>BuildBridge · Quote desk</title>
   <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
-<header>
-  <div class="brand"><span class="mark">Q</span> Quote Builder Crew</div>
-  <div class="header-right">
-    <span>Construction estimating workspace</span>
-    <button id="logout" class="btn secondary hidden">Sign out</button>
-  </div>
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="app-header">
+  <a class="brand" href="/" aria-label="BuildBridge home"><span class="mark" aria-hidden="true">B</span>BuildBridge</a>
+  <div class="header-right"><span id="workspace-name">Construction quote desk</span><button id="logout" class="btn secondary hidden">Sign out</button></div>
 </header>
-
 <div id="notice" class="notice" role="status" aria-live="polite"></div>
-
-<section id="auth-view" class="auth">
-  <div class="panel">
-    <div class="eyebrow">Welcome back</div>
-    <h1>Sign in to your workspace</h1>
-    <p>Create job drafts, approve quotes, and export approved PDFs.</p>
+<div id="content" tabindex="-1">
+<section id="auth-view" class="auth" aria-labelledby="sign-in-heading">
+  <div class="auth-intro">
+    <p class="eyebrow">Materials. Estimates. Review.</p>
+    <h2>The work behind<br>a good quote.</h2>
+    <p class="auth-description">Bring the job details together. Check the pricing, resolve the questions, and prepare a quote for review.</p>
+    <ol class="auth-steps"><li><span>01</span>Start with the materials and scope.</li><li><span>02</span>Check the matches and pricing.</li><li><span>03</span>Review the draft before approval.</li></ol>
+    <p class="auth-caption">For contractors and supplier desks.</p>
+  </div>
+  <div class="sign-in-panel">
+    <p class="eyebrow">Your workspace</p><h1 id="sign-in-heading">Sign in</h1>
+    <p>Pick up where the job left off.</p>
     <div id="auth-notice" class="notice" role="alert"></div>
     <form id="login-form">
-      <div class="field"><label for="tenant">Workspace ID</label><input id="tenant" required maxlength="100" autocomplete="organization"></div>
-      <div class="field"><label for="email">Email address</label><input id="email" type="email" required maxlength="254" autocomplete="username"></div>
+      <div class="field"><label for="tenant">Workspace ID</label><input id="tenant" required maxlength="100" autocomplete="organization" placeholder="Your workspace"></div>
+      <div class="field"><label for="email">Email address</label><input id="email" type="email" required maxlength="254" autocomplete="username" placeholder="you@company.com"></div>
       <div class="field"><label for="password">Password</label><input id="password" type="password" required maxlength="256" autocomplete="current-password"></div>
-      <button class="btn primary full" type="submit">Sign in</button>
+      <button class="btn primary full" type="submit">Sign in to workspace <span aria-hidden="true">→</span></button>
     </form>
-    <p class="small">New workspace? An owner initializes it with the bootstrap endpoint. Contact your administrator.</p>
+    <p class="auth-help">Need access? Ask your workspace administrator for your sign-in details.</p>
   </div>
 </section>
-
-<main id="app-view" class="hidden">
-  <div class="welcome">
-    <div><div class="eyebrow">Overview</div><h1>Good work starts with a solid estimate.</h1>
-      <p>Paste rough job notes, review the sourced draft, and approve it before anything goes to a customer.</p></div>
-    <button id="refresh" class="btn secondary">Refresh</button>
-  </div>
-
-  <div class="stats">
-    <div class="panel"><div class="stat-label">Projects</div><div id="project-count" class="stat-value">-</div></div>
-    <div class="panel"><div class="stat-label">Waiting for review</div><div id="review-count" class="stat-value">-</div></div>
-    <div class="panel"><div class="stat-label">Approved quotes</div><div id="approved-count" class="stat-value">-</div></div>
-  </div>
-
-  <div class="layout">
-    <div>
-      <section class="panel">
-        <h2 id="job-heading">New job from notes</h2>
-        <form id="job-form">
-          <div class="field"><label for="job-workflow">Quote source</label><select id="job-workflow"><option value="supplier">Supplier materials and specification research</option><option value="crew">Job estimate from uploaded price list</option></select><p class="small">Supplier mode accepts a materials list, one item per line. Supplier prices, stock, substitutions, and evidence remain subject to review. Labor is excluded.</p></div>
-          <div class="field"><label for="job-notes">Job notes</label>
-            <textarea id="job-notes" rows="6" required maxlength="8000" placeholder="Replace 40 ft of 3/4in copper pipe, 2 shutoff valves, Friday install"></textarea></div>
-          <div class="form-grid">
-            <div class="field"><label for="job-project">Project name</label><input id="job-project" required maxlength="200"></div>
-            <div class="field"><label for="job-customer">Customer (optional)</label><input id="job-customer" maxlength="200"></div>
-            <div class="field"><label for="job-overhead">Overhead (%)</label><input id="job-overhead" type="number" min="0" max="100" step="any" value="0"></div>
-            <div class="field"><label for="job-markup">Markup (%)</label><input id="job-markup" type="number" min="0" max="500" step="any" value="0"></div>
-          </div>
-          <button class="btn primary full" type="submit">Create draft</button>
-        </form>
-        <div id="job-result" class="result hidden"></div>
-      </section>
-
-      <section class="panel">
-        <h2>Saved jobs</h2>
-        <p class="small">Reopen a job to review its questions or continue after a refresh.</p>
-        <div class="table-wrap"><table><thead><tr><th>Job</th><th>Status</th><th></th></tr></thead><tbody id="jobs-table"><tr><td colspan="3" class="empty">Sign in to load jobs.</td></tr></tbody></table></div>
-      </section>
-
-      <section class="panel">
-        <h2>Review queue</h2>
-        <div class="table-wrap"><table>
-          <thead><tr><th>Quote</th><th>Total</th><th>Status</th><th></th></tr></thead>
-          <tbody id="quotes-table"><tr><td colspan="4" class="empty">Sign in to load quotes.</td></tr></tbody>
-        </table></div>
-      </section>
-
-      <section id="quote-detail" class="panel hidden">
-        <h2>Quote review</h2>
-        <div id="quote-body"></div>
-      </section>
+<main id="app-view" class="workspace hidden">
+  <aside class="sidebar" aria-label="Workspace navigation">
+    <p class="eyebrow">Workspace</p>
+    <nav><a href="#quote-desk" class="nav-primary"><span aria-hidden="true">01</span>Quote desk</a><a href="#review-queue"><span aria-hidden="true">02</span>Review queue</a><a href="#saved-jobs"><span aria-hidden="true">03</span>Saved jobs</a><a href="#projects-section"><span aria-hidden="true">04</span>Projects</a><a id="settings-link" href="#workspace-settings"><span aria-hidden="true">05</span>Settings</a></nav>
+    <div class="sidebar-note"><strong>Every draft gets a review.</strong><p>Check scope, pricing, and questions before approving a quote.</p></div>
+  </aside>
+  <div class="workspace-body">
+    <div class="welcome" id="quote-desk"><div><p class="eyebrow">BuildBridge / Workspace</p><h1>Quote desk</h1><p>Create a draft or pick up a job that needs review.</p></div><button id="refresh" class="btn secondary">Refresh workspace</button></div>
+    <dl class="stats" aria-label="Workspace totals"><div><dt>Projects</dt><dd id="project-count">—</dd></div><div><dt>Awaiting review</dt><dd id="review-count">—</dd></div><div><dt>Approved quotes</dt><dd id="approved-count">—</dd></div></dl>
+    <div class="layout">
+      <div class="draft-column">
+        <section class="panel compose-panel" aria-labelledby="job-heading">
+          <div class="section-heading"><h2 id="job-heading">New quote</h2><span class="section-label">Drafting</span></div>
+          <form id="job-form">
+            <div class="form-grid"><div class="field"><label for="job-project">Project name</label><input id="job-project" required maxlength="200" placeholder="e.g. Oak Street renovation"></div><div class="field"><label for="job-customer">Customer <span class="optional">optional</span></label><input id="job-customer" maxlength="200" placeholder="Customer or company"></div></div>
+            <div class="field"><label for="job-workflow">Pricing source</label><select id="job-workflow"><option value="supplier">Supplier materials and specification research</option><option value="crew">Job estimate from uploaded price list</option></select><p id="workflow-help" class="field-help">One material per line. Pricing and availability are checked against your supplier account.</p></div>
+            <div class="field"><label id="job-notes-label" for="job-notes">Materials list</label><textarea id="job-notes" rows="7" required maxlength="8000" placeholder="10 of 2x4x8 SPF studs"></textarea></div>
+            <details class="adjustments"><summary>Pricing adjustments <span>Overhead &amp; markup</span></summary><div class="form-grid"><div class="field"><label for="job-overhead">Overhead (%)</label><input id="job-overhead" type="number" min="0" max="100" step="any" value="0"></div><div class="field"><label for="job-markup">Markup (%)</label><input id="job-markup" type="number" min="0" max="500" step="any" value="0"></div></div></details>
+            <div class="form-footer"><p class="small">A draft is prepared for review.<br>Nothing is sent to the customer.</p><button class="btn primary" type="submit">Create draft <span aria-hidden="true">→</span></button></div>
+          </form>
+          <div id="job-result" class="result hidden" aria-live="polite"></div>
+        </section>
+        <section id="quote-detail" class="panel hidden" aria-labelledby="quote-review-heading"><div class="section-heading"><h2 id="quote-review-heading">Quote review</h2><span class="section-label">Review before approval</span></div><div id="quote-body"></div></section>
+      </div>
+      <div class="queue-column">
+        <section class="panel queue-panel" id="review-queue" aria-labelledby="review-heading"><div class="section-heading"><h2 id="review-heading">Review queue</h2><span class="section-label">Quotes</span></div><p class="section-description">Drafts and approved quotes, in one place.</p><div class="table-wrap"><table><thead><tr><th scope="col">Quote</th><th scope="col">Total</th><th scope="col">Status</th><th scope="col"><span class="sr-only">Action</span></th></tr></thead><tbody id="quotes-table"><tr><td colspan="4" class="empty">Sign in to load quotes.</td></tr></tbody></table></div></section>
+        <section class="panel queue-panel" id="saved-jobs" aria-labelledby="saved-heading"><div class="section-heading"><h2 id="saved-heading">Saved jobs</h2><span class="section-label">Continue work</span></div><p class="section-description">Return to questions and unfinished drafts.</p><div class="table-wrap"><table><thead><tr><th scope="col">Job</th><th scope="col">Status</th><th scope="col"><span class="sr-only">Action</span></th></tr></thead><tbody id="jobs-table"><tr><td colspan="3" class="empty">Sign in to load jobs.</td></tr></tbody></table></div></section>
+      </div>
     </div>
-
-    <div>
-      <section class="panel">
-        <h2>Contractor profile</h2>
-        <form id="profile-form">
-          <div class="field"><label for="p-license">License number</label><input id="p-license" maxlength="60"></div>
-          <div class="field"><label for="p-insurance">Insurance</label><input id="p-insurance" maxlength="500"></div>
-          <div class="field"><label for="p-terms">Payment terms</label><input id="p-terms" maxlength="500"></div>
-          <div class="form-grid">
-            <div class="field"><label for="p-rate">Labor rate ($/hr)</label><input id="p-rate" type="number" min="0" max="10000" step="any" required></div>
-            <div class="field"><label for="p-days">Quote valid (days)</label><input id="p-days" type="number" min="1" max="365" value="30" required></div>
-          </div>
-          <button class="btn primary full" type="submit">Save profile</button>
-        </form>
-      </section>
-
-      <section class="panel">
-        <h2>Price list</h2>
-        <p class="small">CSV with columns name, unit, unit_price, supplier (optional). Rows with formula characters or instruction-like text are rejected.</p>
-        <input id="price-file" type="file" accept=".csv,text/csv" class="file">
-        <button id="price-upload" class="btn secondary full">Upload price list</button>
-        <div id="price-result" class="small"></div>
-      </section>
-
-      <section class="panel">
-        <h2>Add scope to project</h2>
-        <form id="scope-form">
-          <div class="field"><label for="scope-project">Project</label><select id="scope-project" required></select></div>
-          <div class="field"><label for="scope-search">Find a price item</label><input id="scope-search" maxlength="100" placeholder="type part of a name"></div>
-          <div class="field"><label for="scope-price">Price item</label><select id="scope-price" required></select></div>
-          <div class="field"><label for="scope-description">Description</label><input id="scope-description" required maxlength="2000"></div>
-          <div class="form-grid">
-            <div class="field"><label for="scope-qty">Quantity</label><input id="scope-qty" type="number" min="0" step="any" value="1" required></div>
-            <div class="field"><label for="scope-hours">Labor hours / unit</label><input id="scope-hours" type="number" min="0" max="500" step="any" value="0" required></div>
-            <div class="field"><label for="scope-waste">Waste (%)</label><input id="scope-waste" type="number" min="0" max="100" step="any" value="0" required></div>
-          </div>
-          <button class="btn primary full" type="submit">Add scope</button>
-        </form>
-      </section>
-
-      <section class="panel">
-        <h2>Projects</h2>
-        <div class="table-wrap"><table>
-          <thead><tr><th>Project</th><th>Created</th></tr></thead>
-          <tbody id="projects-table"><tr><td colspan="2" class="empty">No projects loaded.</td></tr></tbody>
-        </table></div>
-      </section>
-    </div>
+    <section class="panel projects-panel" id="projects-section" aria-labelledby="projects-heading"><div class="section-heading"><h2 id="projects-heading">Projects</h2><span class="section-label">Workspace records</span></div><div class="table-wrap"><table><thead><tr><th scope="col">Project</th><th scope="col">Created</th></tr></thead><tbody id="projects-table"><tr><td colspan="2" class="empty">No projects loaded.</td></tr></tbody></table></div></section>
+    <details class="workspace-settings" id="workspace-settings"><summary><span>Workspace settings<small>Contractor details, price lists, and scope</small></span><span class="settings-toggle" aria-hidden="true">+</span></summary>
+      <div class="settings-grid">
+        <section class="panel"><div class="section-heading"><h2>Contractor profile</h2></div><form id="profile-form">
+          <div class="field"><label for="p-license">License number</label><input id="p-license" maxlength="60"></div><div class="field"><label for="p-insurance">Insurance</label><input id="p-insurance" maxlength="500"></div><div class="field"><label for="p-terms">Payment terms</label><input id="p-terms" maxlength="500"></div>
+          <div class="form-grid"><div class="field"><label for="p-rate">Labor rate ($/hr)</label><input id="p-rate" type="number" min="0" max="10000" step="any" required></div><div class="field"><label for="p-days">Quote valid (days)</label><input id="p-days" type="number" min="1" max="365" value="30" required></div></div><button class="btn secondary" type="submit">Save profile</button>
+        </form></section>
+        <div>
+          <section class="panel"><div class="section-heading"><h2>Price list</h2></div><p class="section-description">Upload your materials and unit prices as a CSV.</p><details class="csv-help"><summary>Required columns</summary><p class="small">name, unit, unit_price, and optionally supplier. Formula characters and instructions are rejected.</p></details><label for="price-file" class="sr-only">Choose a CSV price list</label><input id="price-file" type="file" accept=".csv,text/csv" class="file"><button id="price-upload" class="btn secondary">Upload price list</button><div id="price-result" class="small" aria-live="polite"></div></section>
+          <section class="panel"><div class="section-heading"><h2>Add project scope</h2></div><form id="scope-form">
+            <div class="field"><label for="scope-project">Project</label><select id="scope-project" required></select></div><div class="field"><label for="scope-search">Find a price item</label><input id="scope-search" maxlength="100" placeholder="Search by material name"></div><div class="field"><label for="scope-price">Price item</label><select id="scope-price" required></select></div><div class="field"><label for="scope-description">Description</label><input id="scope-description" required maxlength="2000"></div>
+            <div class="form-grid"><div class="field"><label for="scope-qty">Quantity</label><input id="scope-qty" type="number" min="0" step="any" value="1" required></div><div class="field"><label for="scope-hours">Labor hours / unit</label><input id="scope-hours" type="number" min="0" max="500" step="any" value="0" required></div><div class="field"><label for="scope-waste">Waste (%)</label><input id="scope-waste" type="number" min="0" max="100" step="any" value="0" required></div></div><button class="btn secondary" type="submit">Add scope</button>
+          </form></section>
+        </div>
+      </div>
+    </details>
+    <footer><strong>BuildBridge</strong><span>Verify scope, supplier pricing, and tax treatment before issuing a quote.</span></footer>
   </div>
-  <footer class="small">Quote Builder Crew. Estimates are decision-support outputs. Verify scope, supplier pricing and tax treatment before issuing.</footer>
 </main>
+</div>
 <script src="/static/config.js"></script>
 <script src="/static/app.js"></script>
 </body>
