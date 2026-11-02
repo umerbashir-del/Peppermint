@@ -16,8 +16,8 @@ try {
     '-e', 'QBC_BOOTSTRAP_SECRET=ci-only-bootstrap', '-e', 'ANTHROPIC_API_KEY=ci-dummy-key',
     '-e', 'ANTHROPIC_MODEL=ci-dummy-model', '-e', 'QBC_CORS_ORIGINS=https://frontend.example', image);
   started = true;
-  const port = docker('port', name, '10000/tcp').split(':').at(-1);
-  const base = `http://127.0.0.1:${port}`;
+  const backendAddress = () => `http://127.0.0.1:${docker('port', name, '10000/tcp').split(':').at(-1)}`;
+  let base = backendAddress();
   async function ready() {
     for (let n = 0; n < 60; n++) {
       try { if ((await fetch(base + '/ready', { signal: AbortSignal.timeout(2000) })).ok) return; } catch { /* starting */ }
@@ -45,6 +45,8 @@ try {
   const project = await fetch(base + '/projects', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ name: 'Persistent CI project' }) });
   assert.equal(project.status, 200);
   docker('restart', name);
+  // Docker can assign a different host port when restarting an ephemeral port binding.
+  base = backendAddress();
   await ready();
   token = await signIn();
   const projects = await (await fetch(base + '/projects', { headers: { Authorization: `Bearer ${token}` } })).json();
