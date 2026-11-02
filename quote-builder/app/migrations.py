@@ -129,6 +129,16 @@ def m006_supplier_bridge(con):
                     (row['id'], scope['supplier_id'], scope['account_id'], int(Decimal(snapshot['costs']['total']) * 100), expiry.isoformat()))
 
 
+def m007_job_progress(con):
+    con.execute('''CREATE TABLE job_progress(
+        tenant_id TEXT NOT NULL, progress_key TEXT NOT NULL, job_id TEXT NOT NULL,
+        created_by TEXT NOT NULL, run_token TEXT NOT NULL, workflow TEXT NOT NULL,
+        attempt INTEGER NOT NULL, status TEXT NOT NULL, steps_json TEXT NOT NULL,
+        started_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+        PRIMARY KEY(tenant_id,progress_key))''')
+    con.execute('CREATE INDEX job_progress_job ON job_progress(tenant_id,job_id,started_at)')
+
+
 MIGRATIONS = [
     (1, "base_schema", m001_base),
     (2, "pricing_and_snapshots", m002_pricing_and_snapshots),
@@ -136,6 +146,7 @@ MIGRATIONS = [
     (4, "auth_hardening", m004_auth_hardening),
     (5, "jobs_and_indexes", m005_jobs_and_indexes),
     (6, 'supplier_bridge', m006_supplier_bridge),
+    (7, 'job_progress', m007_job_progress),
 ]
 
 

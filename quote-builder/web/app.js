@@ -13,6 +13,8 @@ let jobs = [];
 let currentUser = null;
 let profileDirty = false;
 let pendingJob = null;
+let progressWatch = null;
+let progressRestored = false;
 
 try { token = sessionStorage.getItem("qbc_token"); } catch (_) { token = null; }
 
@@ -71,7 +73,7 @@ async function api(path, options = {}) {
   if (!response.ok) {
     const detail = data && data.detail;
     const message = typeof detail === "string" ? detail : (detail && detail.message) || `Request failed (${response.status})`;
-    throw new Error(message);
+    throw Object.assign(new Error(message), { status: response.status });
   }
   return data;
 }
@@ -83,6 +85,11 @@ function showApp() {
   loadAll();
 }
 function signOut() {
+  stopProgress();
+  progressRestored = false;
+  $('quote-progress').innerHTML = '';
+  $('quote-progress').classList.add('hidden');
+  try { sessionStorage.removeItem('qbc_progress'); } catch (_) { /* storage may be blocked */ }
   if (token) { fetch(apiUrl("/auth/logout"), { method: "POST", headers: { Authorization: `Bearer ${token}` } }).catch(() => {}); }
   token = null;
   currentUser = null;
@@ -125,6 +132,15 @@ async function loadAll() {
     $('price-upload').closest('section').classList.toggle('hidden', !canManage());
     $('profile-form').querySelectorAll('input, button').forEach(control => { control.disabled = !canManage(); });
     render();
+    if (!progressRestored && currentUser.role !== 'viewer') {
+      progressRestored = true;
+      try {
+        const saved = JSON.parse(sessionStorage.getItem('qbc_progress'));
+        if (saved?.key && typeof saved.key === 'string') watchProgress(saved.key, true);
+      } catch (_) { /* no saved run */ }
+    } else if (progressWatch && !progressWatch.live) {
+      progressWatch.poll();
+    }
   } catch (err) {
     showError(err);
   }
@@ -204,7 +220,103 @@ $("job-workflow").addEventListener('change', updateJobHint);
 updateJobHint();
 
 // ---------- job from notes ----------
-function renderJob(job) {
+function stopProgress() {
+  if (progressWatch) {
+    progressWatch.live = false;
+    progressWatch.cancelled = true;
+    clearTimeout(progressWatch.timer);
+    if (progressWatch.restoredForm) { progressWatch.restoredForm(); progressWatch.restoredForm = null; }
+  }
+}
+
+function renderProgress(data) {
+  if (!Array.isArray(data.steps)) return;
+  const titles = { running: 'Work in progress', ready: 'Draft ready for review', needs_input: 'We need your input', failed: 'Couldn’t finish this run', interrupted: 'Updates interrupted', approved: 'Quote approved', rejected: 'Quote needs revision' };
+  const states = { waiting: 'Not started', running: 'Working', complete: 'Complete', needs_input: 'Needs your input', failed: 'Couldn’t finish', skipped: 'Not needed' };
+  if (data.status === 'interrupted') states.running = 'Last seen working';
+  const symbols = { waiting: '○', running: '●', complete: '✓', needs_input: '!', failed: '!', skipped: '—' };
+  const panel = $('quote-progress');
+  panel.innerHTML = `<div class="section-heading"><h2>Quote progress</h2><span class="section-label">Run ${esc(data.attempt)}</span></div>
+    <p class="progress-title" role="status">${esc(titles[data.status] || 'Checking status')}</p>
+    ${data.workflow === 'crew' ? '<p class="small">Pricing and quote writing run in parallel.</p>' : ''}
+    <ol class="progress-steps">${data.steps.map(step => `<li class="progress-step ${esc(step.status)}" ${step.status === 'running' ? 'aria-current="step"' : ''}><span class="progress-symbol" aria-hidden="true">${esc(symbols[step.status] || '○')}</span><span><strong>${esc(step.label)}</strong><small>${esc(states[step.status] || 'Unknown')}</small></span></li>`).join('')}</ol>
+    ${data.status === 'needs_input' ? '<p class="small">Review the questions below. Your clarification starts another check.</p>' : ''}
+    ${data.status === 'interrupted' ? '<p class="small">This run stopped reporting. Refresh saved jobs before retrying.</p>' : ''}
+    <p class="progress-connection small" role="status"></p>`;
+  panel.classList.remove('hidden');
+  panel.setAttribute('aria-busy', String(data.status === 'running'));
+}
+
+function watchProgress(key, recover = false, requestPending = false) {
+  stopProgress();
+  progressRestored = true;
+  const watch = { key, token, live: true, cancelled: false, recover, requestPending, started: Date.now(), signature: '', restoredForm: null };
+  progressWatch = watch;
+  const panel = $('quote-progress');
+  panel.innerHTML = '<h2>Quote progress</h2><p role="status" class="small">Waiting for the server to confirm the run…</p>';
+  panel.classList.remove('hidden');
+  panel.setAttribute('aria-busy', 'true');
+  try { sessionStorage.setItem('qbc_progress', JSON.stringify({ key })); } catch (_) { /* storage may be blocked */ }
+  const active = () => !watch.cancelled && watch.token === token && progressWatch === watch;
+  watch.poll = async () => {
+    if (!active() || watch.polling) return;
+    watch.polling = true;
+    try {
+      const data = await api(`/job-progress/${encodeURIComponent(key)}`, { signal: AbortSignal.timeout(6000) });
+      if (!active() || !Array.isArray(data.steps)) return;
+      const signature = JSON.stringify(data);
+      // A correction may initially see the previous attempt. Keep checking until
+      // the current POST has registered its run or returned its final job.
+      if (!watch.requestPending || data.status === 'running') {
+        if (watch.signature !== signature) { renderProgress(data); watch.signature = signature; }
+        const message = panel.querySelector('.progress-connection');
+        if (message) message.textContent = '';
+      }
+      watch.live = watch.requestPending || data.status === 'running';
+      if (watch.recover && watch.live && !watch.restoredForm) watch.restoredForm = busyForm($('job-form'), 'Checking saved run…');
+      if (!watch.live) {
+        try { sessionStorage.removeItem('qbc_progress'); } catch (_) { /* storage may be blocked */ }
+        if (watch.restoredForm) { watch.restoredForm(); watch.restoredForm = null; }
+        if (watch.recover && ['ready', 'needs_input'].includes(data.status)) {
+          watch.recover = false;
+          const job = await api(`/jobs/${encodeURIComponent(data.job_id)}`);
+          if (!active()) return;
+          pendingJob = null;
+          renderJob(job, false);
+          await loadAll();
+        }
+        return;
+      }
+    } catch (error) {
+      if (!active() || error.staleSession) return;
+      if (error.status === 403) { stopProgress(); panel.classList.add('hidden'); return; }
+      if (error.status === 404 && !watch.requestPending && (watch.requestRejected || key.startsWith('job:'))) {
+        watch.live = false;
+        panel.innerHTML = `<h2>Quote progress</h2><p class="small" role="status">${key.startsWith('job:') ? 'No progress history is available for this saved job.' : 'The run did not start. Check the request error before retrying.'}</p>`;
+        panel.setAttribute('aria-busy', 'false');
+        try { sessionStorage.removeItem('qbc_progress'); } catch (_) { /* storage may be blocked */ }
+        return;
+      }
+      if (error.status !== 404) {
+        const message = panel.querySelector('.progress-connection');
+        if (message) message.textContent = 'Live updates are temporarily unavailable. Your run may still be working.';
+      }
+    } finally { watch.polling = false; }
+    if (active() && Date.now() - watch.started < 300000) watch.timer = setTimeout(watch.poll, 1000);
+    else if (active()) {
+      watch.live = false;
+      if (watch.restoredForm) watch.restoredForm();
+      panel.setAttribute('aria-busy', 'false');
+      const message = panel.querySelector('.progress-connection');
+      if (message) message.textContent = 'Status could not be confirmed. Refresh saved jobs before retrying.';
+    }
+  };
+  watch.poll();
+  return watch;
+}
+
+function renderJob(job, showProgress = true) {
+  if (showProgress && currentUser?.role !== 'viewer') watchProgress('job:' + job.id);
   $('job-readonly-hint').classList.add('hidden');
   const panel = $("job-result");
   const lines = [];
@@ -258,6 +370,9 @@ $("job-form").addEventListener("submit", async (event) => {
     };
     const signature = JSON.stringify([token, input]);
     if (pendingJob?.signature !== signature) pendingJob = { signature, key: newIdempotencyKey() };
+    $('job-result').classList.add('hidden');
+    $('quote-detail').classList.add('hidden');
+    watchProgress('create:' + pendingJob.key, false, true);
     const job = await api("/jobs", {
       method: "POST",
       headers: { "Idempotency-Key": pendingJob.key }, json: input,
@@ -268,6 +383,7 @@ $("job-form").addEventListener("submit", async (event) => {
     notify($("notice"), job.status === "ready" ? "Draft quote created for review." : job.status === 'failed' ? 'An agent could not finish. Review the job details and retry.' : "Review the questions below before drafting.", job.status === "ready" ? "success" : "error");
     $('job-result').scrollIntoView({ behavior: 'smooth', block: 'center' });
   } catch (err) {
+    if (progressWatch) { progressWatch.requestPending = false; progressWatch.recover = true; progressWatch.requestRejected = [400, 403, 422, 429].includes(err.status); progressWatch.poll(); }
     showError(err);
   } finally { restore(); }
 });
@@ -280,11 +396,13 @@ $("job-result").addEventListener("submit", async (event) => {
   try {
     const jobId = $("job-result").dataset.jobId;
     const answers = $("answer-text").value;
+    watchProgress('answer:' + jobId, false, true);
     const job = await api(`/jobs/${encodeURIComponent(jobId)}/answers`, { method: "POST", json: { answers } });
     if (job.workflow === 'supplier') $('job-notes').value = answers;
     renderJob(job);
     await loadAll();
   } catch (err) {
+    if (progressWatch) { progressWatch.requestPending = false; progressWatch.recover = true; progressWatch.requestRejected = [400, 403, 422, 429].includes(err.status); progressWatch.poll(); }
     showError(err);
   } finally { restore(); }
 });

@@ -124,6 +124,22 @@ td .amount { white-space: nowrap; }
 .amount { font-variant-numeric: tabular-nums; font-weight: 650; }
 .mono { font-family: ui-monospace, Consolas, monospace; font-size: 10px; word-break: break-all; color: var(--muted); }
 .record-details { margin: 16px 0; color: var(--muted); font-size: 11px; }
+.quote-progress { margin-top: 24px; border-top: 1px solid var(--line); padding-top: 22px; }
+.quote-progress h2 { font-size: 15px; margin: 0; }
+.quote-progress .section-heading { margin-bottom: 8px; }
+.progress-title { font-size: 13px; margin: 0 0 16px; color: var(--green); }
+.progress-steps { padding: 0; margin: 18px 0; list-style: none; }
+.progress-step { display: flex; gap: 12px; position: relative; padding-bottom: 16px; color: var(--muted); }
+.progress-step:not(:last-child)::after { content: ''; position: absolute; left: 10px; top: 23px; bottom: 3px; border-left: 1px solid var(--line); }
+.progress-symbol { display: grid; place-items: center; flex: 0 0 22px; height: 22px; border: 1px solid var(--line); border-radius: 50%; background: var(--panel); font-size: 12px; }
+.progress-step strong { display: block; font-size: 12px; font-weight: 550; }
+.progress-step small { display: block; font-size: 10px; margin-top: 2px; }
+.progress-step.running { color: var(--green); }
+.progress-step.running .progress-symbol { border-color: var(--green); box-shadow: 0 0 0 3px #294e3d12; }
+.progress-step.complete .progress-symbol { color: var(--green); background: #e9f0e4; border-color: #c6d6bd; }
+.progress-step.needs_input, .progress-step.failed { color: #81552a; }
+.progress-step.failed .progress-symbol { border-color: #d6a28e; color: var(--danger); }
+.progress-connection:empty { display: none; }
 .file { display: block; width: 100%; font-size: 12px; margin: 16px 0; }
 .file::file-selector-button { background: #eef0e7; border: 1px solid var(--line); padding: 9px 12px; border-radius: 3px; margin-right: 12px; color: var(--ink); cursor: pointer; }
 .notice { display: none; margin: 0 0 18px; padding: 12px 15px; border: 1px solid transparent; border-radius: 4px; font-size: 12px; line-height: 1.6; }

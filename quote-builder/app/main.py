@@ -21,6 +21,7 @@ from app.audit import audit, verify_chain
 from app.catalog import MAX_BYTES, UNITS, parse_price_csv
 from app.crew import service as crew_service
 from app import supplier_agents
+from app import progress
 from app.config import cors_origins
 from app.db import connect, init_db
 from app.logging_setup import configure
@@ -635,6 +636,13 @@ async def answer_job(job_id: str, data: AnswerIn, u=Depends(role("owner", "admin
 
 
 # ---------- audit ----------
+@app.get('/job-progress/{progress_key}')
+def job_progress(progress_key: str, u=Depends(current_user)):
+    if len(progress_key) > 160:
+        raise HTTPException(422, 'Invalid progress key')
+    return progress.view(connect, u, progress_key)
+
+
 @app.get("/audit")
 def audit_events(u=Depends(role("owner", "admin"))):
     with connect() as c:

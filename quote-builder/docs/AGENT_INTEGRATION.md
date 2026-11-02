@@ -28,6 +28,14 @@ For local synthetic testing only, set `QBC_ALLOW_SAMPLE_SUPPLIER=true` without a
 
 ## Flow and review
 
+### Live quote progress
+
+The existing job POST responses remain compatible. While `POST /jobs` is pending, poll `GET /job-progress/create:<Idempotency-Key>` once per second. Corrections use `GET /job-progress/answer:<job-id>`, and saved jobs use `GET /job-progress/job:<job-id>` for the latest attempt. Requests use the same bearer authentication; progress is tenant-scoped and unavailable to view-only users. A short initial 404 means the server has not registered the run yet.
+
+The response contains `job_id`, `workflow`, `attempt`, `status`, `steps`, and `updated_at`. Steps contain fixed labels and states (`waiting`, `running`, `complete`, `needs_input`, `failed`, `skipped`), with no prompts, tool arguments, or provider errors. Supplier and research milestones come from the worker's bounded JSON-line stream. Crew pricing and writing report independently because they run in parallel. Research is marked skipped only when the supplier returns without handoffs. A prepared draft still awaits rep approval; the approval step reads the saved quote's actual review status.
+
+Progress is saved in SQLite and survives page refresh. Polling never starts agent work. Each correction gets a new attempt, and late updates from an older attempt cannot overwrite its replacement. Runs stop being presented as active after four minutes without finishing. This is observability for the existing bounded, synchronous job request, not a durable background queue: server restarts can interrupt work. On an interrupted or unconfirmed run, refresh saved jobs before manually retrying. The browser stops checking after five minutes and clears private progress on sign-out.
+
 `POST /jobs` accepts `workflow: "supplier"` and a materials list such as `10 of 2x4x8 SPF studs`, one item per line. Existing callers default to `workflow: "crew"`. The local parser preserves unresolved input. The supplier worker uses live Anthropic tool calls and authoritative source calculations. Up to three specification handoffs invoke the real research worker. They never authorize substitutions. Research and questions are retained in tenant-scoped job results and displayed on the website. Failed or partial supplier quotes never become customer draft quotes.
 
 Fully resolved original materials within available credit become a normal website draft with an exact snapshot and the complete worker provenance. Each supplied line is represented as one sourced lot so its discounted, rounded supplier total is preserved exactly; original quantities, units, and allocations remain in the snapshot. Installation labor is excluded. Existing overhead, markup, and tax inputs apply after supplier material pricing.

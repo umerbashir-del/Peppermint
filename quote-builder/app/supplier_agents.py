@@ -11,6 +11,7 @@ from fastapi import HTTPException
 
 from app.config import ROOT
 from app import ratelimit
+from app import progress
 from app.crew.service import _save
 from app.quotes import build_quote, load_profile
 
@@ -69,10 +70,13 @@ async def bridge(payload):
         except (OSError, NotImplementedError):
             raise HTTPException(503, 'The supplier agent runtime is unavailable.') from None
         try:
-            stdout, _ = await asyncio.wait_for(process.communicate(json.dumps(payload).encode()), 200)
-            if len(stdout) > 2_000_000:
-                raise ValueError('oversized response')
-            reply = json.loads(stdout)
+            if progress.current.get() and payload.get('operation') == 'run':
+                reply = await asyncio.wait_for(_stream_worker(process, payload), 200)
+            else:
+                stdout, _ = await asyncio.wait_for(process.communicate(json.dumps(payload).encode()), 200)
+                if len(stdout) > 2_000_000:
+                    raise ValueError('oversized response')
+                reply = json.loads(stdout)
             if process.returncode or not isinstance(reply, dict) or reply.get('ok') is not True or not isinstance(reply.get('result'), dict):
                 raise ValueError('worker failed')
             validate_worker_result(reply['result'], payload)
@@ -83,6 +87,36 @@ async def bridge(payload):
             if process.returncode is None:
                 process.kill()
                 await process.wait()
+
+
+async def _stream_worker(process, payload):
+    process.stdin.write(json.dumps({**payload, 'progress_events': True}).encode())
+    await process.stdin.drain()
+    process.stdin.close()
+    total, frames, reply = 0, 0, None
+    async for line in process.stdout:
+        total += len(line)
+        frames += 1
+        if total > 2_000_000 or frames > 128:
+            raise ValueError('Worker output limit reached')
+        frame = json.loads(line)
+        if not isinstance(frame, dict):
+            raise ValueError('Invalid worker frame')
+        if frame.get('type') == 'progress' and reply is None:
+            event = frame.get('event')
+            if not isinstance(event, dict) or set(event) != {'stage', 'status'} or not all(isinstance(value, str) for value in event.values()):
+                raise ValueError('Invalid progress event')
+            if event['stage'] not in {'materials', 'supplier', 'research'} or event['status'] not in progress.STATES:
+                raise ValueError('Worker cannot report draft creation or human approval')
+            progress.report(event['stage'], event['status'])
+        elif frame.get('type') == 'result' and reply is None:
+            if not isinstance(frame.get('reply'), dict):
+                raise ValueError('Invalid worker result frame')
+            reply = frame['reply']
+        else:
+            raise ValueError('Invalid worker frame')
+    await process.wait()
+    return reply
 
 
 async def execute(c_factory, user, job, policy):
@@ -100,12 +134,18 @@ async def execute(c_factory, user, job, policy):
     if agents.get('research_limit_reached'):
         questions.append('Additional specification questions require rep review.')
     ready = agents['ready']
+    if progress.current.get():
+        for stage, result in [('materials', agents['parser']), ('supplier', supplier)]:
+            if result:
+                progress.report(stage, 'complete' if result['status'] == 'completed' else 'failed' if result['status'] == 'failed' else 'needs_input')
     if not ready and not questions:
         questions.append('Supplier pricing, stock, or credit requires review before drafting.')
     failed_agent = 'supplier' if supplier and supplier['status'] == 'failed' else 'parser' if agents['parser']['status'] == 'failed' else None
     output = {'workflow': 'supplier', 'status': 'failed' if failed_agent else 'ready' if ready else 'needs_input', 'failed_half': failed_agent,
               'items': [], 'missing': [], 'questions': questions, 'flags': [], 'problems': [], 'trace': [],
               'quote': None, 'project_id': None, 'policy': policy, 'agents': agents}
+    if ready:
+        progress.report('draft', 'running')
     with c_factory() as c:
         if ready:
             project_id = str(uuid.uuid4())
@@ -133,6 +173,8 @@ async def execute(c_factory, user, job, policy):
                                           job_id=job['id'], supplier_agents=agents)
             output['project_id'] = project_id
         _save(c, user, job, output)
+    if ready:
+        progress.report('draft', 'complete')
     return output
 
 
@@ -187,4 +229,15 @@ async def claimed_execute(c_factory, user, job, policy, execute, initial=False):
             current = c.execute('SELECT status,updated_at FROM jobs WHERE tenant_id=? AND idempotency_key=?', (user['tenant_id'], job['idempotency_key'])).fetchone()
             if current and (initial or current['status'] == 'ready' or current['updated_at'] != job['updated_at']):
                 raise HTTPException(409, 'Job changed or completed. Refresh before retrying.')
-        return await execute(c_factory, user, job, policy)
+        workflow = 'supplier' if execute is globals()['execute'] else 'crew'
+        run = progress.Run(c_factory, user, job, key, workflow)
+        context = progress.current.set(run)
+        try:
+            output = await execute(c_factory, user, job, policy)
+            run.finish(output['status'])
+            return output
+        except BaseException:
+            run.finish('failed')
+            raise
+        finally:
+            progress.current.reset(context)

@@ -25,6 +25,7 @@ async function browser(extra = {}) {
   get('job-workflow').value = 'supplier';
   get('job-result').classList.add('hidden');
   const events = {}, calls = [], timers = [], storage = new Map([['qbc_token', 'session-A']]);
+  if (extra.progress) storage.set('qbc_progress', JSON.stringify({ key: extra.progress }));
   const pending = { id: 'pending-job', project_name: 'Saved question job', status: 'needs_input', workflow: 'supplier', notes: 'some wood', questions: ['PRIVATE question'], policy: {}, quote: null };
   const routes = { '/projects': [{ id: 'private-project', name: 'PRIVATE Project' }], '/quotes': [], '/price-items?limit=200': [{ id: 'private-price', name: 'PRIVATE Catalog', unit: 'each', unit_price: '4.20' }], '/jobs': [pending], '/jobs/pending-job': pending,
     '/profile': { labor_rate: '45.00', valid_until_days: 30 }, '/auth/me': { id: 'owner-id', role: 'owner', tenant_id: 'a' },
@@ -32,7 +33,7 @@ async function browser(extra = {}) {
   const response = body => ({ status: 200, ok: true, json: async () => body });
   const context = { document: { getElementById: get, addEventListener: (name, fn) => { events[name] = fn; } },
     sessionStorage: { getItem: k => storage.get(k), setItem: (k,v) => storage.set(k,v), removeItem: k => storage.delete(k) },
-    crypto: webcrypto, window: { crypto: webcrypto, QBC_CONFIG: extra.config }, URL, setTimeout: fn => timers.push(fn),
+    crypto: webcrypto, window: { crypto: webcrypto, QBC_CONFIG: extra.config }, URL, AbortSignal, clearTimeout() {}, setTimeout: fn => timers.push(fn),
     fetch: async (path, options = {}) => { calls.push({ path, options }); return extra.fetch ? extra.fetch(path, options, response, routes) : response(routes[path] || {}); } };
   runInNewContext(script, context);
   await tick(); await tick();
@@ -45,6 +46,69 @@ test('dashboard restores saved profile and jobs while preserving unsaved profile
   page.get('p-rate').value = '60'; page.get('profile-form').listeners.input();
   await page.get('refresh').listeners.click();
   assert.equal(page.get('p-rate').value, '60');
+});
+
+const runningProgress = () => ({ job_id: 'pending-job', workflow: 'supplier', attempt: 1, status: 'running', steps: [
+  { id: 'materials', label: 'Read materials list', status: 'complete' },
+  { id: 'supplier', label: 'Check supplier', status: 'running' },
+  { id: 'research', label: 'Check specifications', status: 'waiting' },
+  { id: 'draft', label: 'Prepare draft', status: 'waiting' },
+  { id: 'review', label: 'Rep approval', status: 'waiting' },
+] });
+
+test('restored progress polls without submitting another job and never simulates completion', async () => {
+  let state = runningProgress();
+  const page = await browser({ progress: 'create:saved', fetch: (path, options, response, routes) => response(path.startsWith('/job-progress/') ? state : routes[path] || {}) });
+  assert.match(page.get('quote-progress').innerHTML, /Work in progress/);
+  assert.match(page.get('quote-progress').innerHTML, /Check supplier<\/strong><small>Working/);
+  assert.equal(page.get('job-form').button.disabled, true);
+  await page.timers.shift()();
+  assert.match(page.get('quote-progress').innerHTML, /Prepare draft<\/strong><small>Not started/);
+  state = { ...state, status: 'ready', steps: state.steps.map(s => ({ ...s, status: s.id === 'review' ? 'waiting' : s.id === 'research' ? 'skipped' : 'complete' })) };
+  await page.timers.shift()();
+  assert.match(page.get('quote-progress').innerHTML, /Draft ready for review/);
+  assert.match(page.get('quote-progress').innerHTML, /Rep approval<\/strong><small>Not started/);
+  assert.equal(page.get('job-form').button.disabled, false);
+  assert.equal(page.calls.filter(c => c.options.method === 'POST').length, 0);
+  assert.ok(page.calls.some(c => c.path === '/jobs/pending-job'));
+});
+
+test('late progress responses after sign-out cannot restore private status', async () => {
+  let resolve;
+  const page = await browser({ progress: 'create:saved', fetch: (path, options, response, routes) => path.startsWith('/job-progress/') ? new Promise(done => { resolve = () => done(response(runningProgress())); }) : response(routes[path] || {}) });
+  page.get('logout').listeners.click();
+  resolve(); await tick(); await tick();
+  assert.equal(page.get('quote-progress').innerHTML, '');
+  assert.equal(page.get('quote-progress').classList.contains('hidden'), true);
+  assert.equal(page.timers.length, 0);
+});
+
+test('a correction keeps polling past the previous attempt instead of claiming the new run is done', async () => {
+  let state = { ...runningProgress(), status: 'needs_input' };
+  const page = await browser({ fetch: (path, options, response, routes) => response(path.startsWith('/job-progress/') ? state : routes[path] || {}) });
+  const watch = page.context.watchProgress('answer:pending-job', false, true);
+  await tick();
+  assert.match(page.get('quote-progress').innerHTML, /Waiting for the server/);
+  assert.equal(watch.live, true);
+  state = { ...runningProgress(), attempt: 2 };
+  await page.timers.shift()();
+  assert.match(page.get('quote-progress').innerHTML, /Run 2/);
+  assert.match(page.get('quote-progress').innerHTML, /Work in progress/);
+});
+
+test('opening a job created before progress tracking reports missing history without endless polling', async () => {
+  const page = await browser({ fetch: (path, options, response, routes) => path.startsWith('/job-progress/') ? { status:404, ok:false, json:async()=>({detail:'Progress is not available yet'}) } : response(routes[path] || {}) });
+  page.context.watchProgress('job:legacy-job');
+  await tick();
+  assert.match(page.get('quote-progress').innerHTML, /No progress history is available/);
+  assert.equal(page.timers.length, 0);
+});
+
+test('interrupted progress describes the last observed stage without claiming it is still working', async () => {
+  const page = await browser({ progress: 'create:saved', fetch: (path, options, response, routes) => response(path.startsWith('/job-progress/') ? { ...runningProgress(), status: 'interrupted' } : routes[path] || {}) });
+  assert.match(page.get('quote-progress').innerHTML, /Last seen working/);
+  assert.match(page.get('quote-progress').innerHTML, /Refresh saved jobs before retrying/);
+  assert.equal(page.get('job-form').button.disabled, false);
 });
 test('repeated job submissions make one request and show busy controls until completion', async () => {
   let finish;

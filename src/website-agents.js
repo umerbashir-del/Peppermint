@@ -57,12 +57,15 @@ function validateSource(binding, data) {
   }
 }
 
-export async function runWebsiteAgents(input, { load = websiteSupplier, respond = responses, researchOptions = {}, runResearch = runResearchTask, live = true } = {}) {
+export async function runWebsiteAgents(input, { load = websiteSupplier, respond = responses, researchOptions = {}, runResearch = runResearchTask, live = true, onProgress = async () => {} } = {}) {
+  const emit = (stage, status) => onProgress({ stage, status });
   const { binding, data } = await load(input.tenant_id);
   validateSource(binding, data);
   if (input.operation === 'context') return { account_id: binding.account_id, branch: binding.branch, sample_data: Boolean(data.sample_data), source: data.source ?? 'Sample supplier dataset' };
   const base = { schema_version: '1.0', request_id: input.request_id };
+  if (input.operation !== 'check') await emit('materials', 'running');
   const parsed = input.operation === 'check' ? null : await runParserTask({ ...base, task_id: 'website-parser', agent: 'materials_parser', input: { text: input.text, format: 'text' } });
+  if (parsed) await emit('materials', parsed.status === 'completed' ? 'complete' : parsed.status === 'failed' ? 'failed' : 'needs_input');
   if (parsed && parsed.status !== 'completed') return { parser: parsed, supplier: null, research: [], ready: false };
   const lines = parsed ? parsed.data.supplier_lines : input.lines;
   const controller = new AbortController();
@@ -74,14 +77,18 @@ export async function runWebsiteAgents(input, { load = websiteSupplier, respond 
     return respond(body, { signal: controller.signal });
   };
   try {
+    if (input.operation !== 'check') await emit('supplier', 'running');
     const supplier = await runSupplierTask({ ...base, task_id: 'website-supplier', agent: 'supplier_quote_desk', input: { account_id: binding.account_id, branch: binding.branch, delivery: null, lines } }, { supplierData: data, live: input.operation === 'check' ? false : live, respond: bounded });
+    if (input.operation !== 'check') await emit('supplier', supplier.status === 'completed' ? 'complete' : supplier.status === 'failed' ? 'failed' : 'needs_input');
     const research = [];
+    if (input.operation !== 'check') await emit('research', supplier.handoffs.length ? 'running' : 'skipped');
     if (input.operation !== 'check') for (const task of supplier.handoffs.slice(0, 3)) {
       try {
         const result = await runResearch(task, { ...researchOptions, respond: bounded });
         research.push(researchMatches(result, task) ? result : failedResearch(task, 'HANDOFF_MISMATCH'));
       } catch { research.push(failedResearch(task, 'HANDOFF_FAILED')); }
     }
+    if (research.length) await emit('research', research.every(result => result.status === 'completed') ? 'complete' : research.some(result => result.status === 'failed') ? 'failed' : 'needs_input');
     const account = data.accounts.find(account => account.id === binding.account_id);
     const commercialCredit = input.operation !== 'check' || (Number.isSafeInteger(input.commercial_total_cents) && input.commercial_total_cents >= 0 && account.open_balance_cents + input.commercial_total_cents <= account.credit_limit_cents);
     const approvalEligible = input.operation !== 'check' || data.sample_data || (data.commercial_use === true && data.stock_confirmed === true && Date.parse(data.valid_until) > Date.now());

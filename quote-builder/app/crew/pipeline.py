@@ -14,6 +14,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from app.crew import contracts
+from app.progress import crew_event
 from app.crew.llm import Budget, Gateway
 from app.crew.prompts import load_prompt
 from app.quotes import SLOT, digits_outside_known_text
@@ -49,6 +50,7 @@ class Workspace:
     def event(self, team: str, kind: str, **detail: Any) -> None:
         # Counts and categories only. Raw model output is never written to the trace.
         self.trace.append({"at": _now(), "mono": time.monotonic(), "team": team, "event": kind, **detail})
+        crew_event(team, kind, detail)
 
 
 @dataclass

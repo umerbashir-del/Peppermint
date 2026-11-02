@@ -11,6 +11,35 @@ import { join } from 'node:path';
 
 const input = text => ({ operation: 'run', tenant_id: 'tenant-a', request_id: 'website-test', text });
 const load = async () => ({ binding: { account_id: 'normal', branch: 'sample-main' }, data: await loadSupplier() });
+
+test('progress follows actual parser and supplier work and skips unnecessary research', async () => {
+  const events = [];
+  const result = await runWebsiteAgents(input('10 of 2x4x8 SPF studs'), { load, live: false, onProgress: event => events.push(event) });
+  assert.equal(result.ready, true);
+  assert.deepEqual(events, [
+    { stage: 'materials', status: 'running' }, { stage: 'materials', status: 'complete' },
+    { stage: 'supplier', status: 'running' }, { stage: 'supplier', status: 'complete' },
+    { stage: 'research', status: 'skipped' },
+  ]);
+  events.length = 0;
+  await runWebsiteAgents({ ...input(), operation: 'check', lines: result.lines, commercial_total_cents: 3864 }, { load, onProgress: event => events.push(event) });
+  assert.deepEqual(events, [], 'approval checks cannot invent agent progress');
+});
+
+test('research reports working before the handoff returns, while ambiguous parsing stops early', async () => {
+  const events = [];
+  await runWebsiteAgents(input('40 of 2x10x12 SPF joists'), {
+    load, live: false, onProgress: event => events.push(event),
+    runResearch: async task => {
+      assert.deepEqual(events.at(-1), { stage: 'research', status: 'running' });
+      return runResearchTask(task, mockResearchOptions());
+    },
+  });
+  assert.deepEqual(events.at(-1), { stage: 'research', status: 'complete' });
+  events.length = 0;
+  await runWebsiteAgents(input('some wood'), { load, live: false, onProgress: event => events.push(event) });
+  assert.deepEqual(events, [{ stage: 'materials', status: 'running' }, { stage: 'materials', status: 'needs_input' }]);
+});
 test('website runs the real parser and supplier and preserves exact discounted totals', async () => {
   const result = await runWebsiteAgents(input('10 of 2x4x8 SPF studs'), { load, live: false });
   assert.equal(result.ready, true);

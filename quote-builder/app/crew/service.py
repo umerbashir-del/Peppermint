@@ -9,6 +9,7 @@ from app.crew.intake import clean_notes
 from app.crew.llm import Gateway, NotConfigured, gateway_from_env
 from app.crew.pipeline import run_crew
 from app.quotes import build_quote, load_profile
+from app.progress import report
 
 MAX_CATALOG_ROWS = 5000
 
@@ -34,6 +35,7 @@ def _now() -> str:
 async def execute(c_factory, u: dict, job: dict, policy: dict) -> dict:
     """Runs the crew for one job. c_factory is connect(); it is opened only for reads and, afterwards, for writes."""
     cleaned, flags = clean_notes(job["notes"])
+    report('materials', 'running')
     with c_factory() as c:
         if not load_profile(c, u["tenant_id"]):
             raise HTTPException(422, "Set the contractor profile (labor rate) before creating a job")
@@ -51,6 +53,7 @@ async def execute(c_factory, u: dict, job: dict, policy: dict) -> dict:
 
     with c_factory() as c:
         if result.status == "ready":
+            report('draft', 'running')
             customer = {"name": job.get("customer_name"), "project_name": job["project_name"]}
             project_id = str(uuid.uuid4())
             customer_id = None
@@ -70,6 +73,8 @@ async def execute(c_factory, u: dict, job: dict, policy: dict) -> dict:
             output["quote"] = quote
             output["project_id"] = project_id
         _save(c, u, job, output)
+    if result.status == 'ready':
+        report('draft', 'complete')
     return output
 
 
