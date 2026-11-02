@@ -118,6 +118,7 @@ async function loadAll() {
     if (loadToken !== token) return;
     [projects, quotes, priceItems, jobs] = values;
     const profile = values[4]; currentUser = values[5];
+    updateJobHint();
     $('workspace-name').textContent = currentUser.tenant_id;
     if (!profileDirty) {
       for (const [id, value] of Object.entries({ 'p-license': profile.license_number || '', 'p-insurance': profile.insurance_text || '', 'p-terms': profile.payment_terms || '', 'p-rate': profile.labor_rate ?? '', 'p-days': profile.valid_until_days ?? 30 })) $(id).value = value;
@@ -210,7 +211,9 @@ function updateJobHint() {
   const supplier = $("job-workflow").value === 'supplier';
   $('job-notes-label').textContent = supplier ? 'Materials list' : 'Job description';
   $('workflow-help').textContent = supplier
-    ? 'One material per line. Prices and availability are checked against your supplier account. Labor is excluded.'
+    ? currentUser?.supplier_demo
+      ? 'SAMPLE DATA — demo catalog, prices, stock, and credit only. No live supplier connection. Labor is excluded.'
+      : 'One material per line. Prices and availability are checked against your supplier account. Labor is excluded.'
     : 'Estimate materials and labor from the job notes using your uploaded price list.';
   $("job-notes").placeholder = supplier
     ? '10 of 2x4x8 SPF studs\n2 sheets of 4x8 half-inch drywall'

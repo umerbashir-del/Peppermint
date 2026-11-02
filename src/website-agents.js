@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { createHash } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 import { supplierProvider } from './pilot/provider.js';
 import { runParserTask } from './parser-interface.js';
 import { runSupplierTask } from './supplier-interface.js';
@@ -25,15 +26,20 @@ function failedResearch(task, code) {
 export async function websiteSupplier(tenantId) {
   const file = process.env.QBC_SUPPLIER_BINDINGS_FILE;
   let binding;
+  let demo = false;
   if (file) {
     const bindings = JSON.parse(await readFile(file, 'utf8'));
     binding = bindings[tenantId];
     if (!binding || !binding.source_file) throw new Error('No supplier access is configured for this workspace.');
     binding = { ...binding, source_file: resolve(dirname(resolve(file)), binding.source_file) };
+  } else if ((process.env.QBC_DEMO_SUPPLIER_TENANTS ?? '').split(',').map(value => value.trim()).filter(Boolean).includes(tenantId)) {
+    demo = true;
+    binding = { supplier_id: 'pilot-supplier', account_id: 'normal', branch: 'sample-main', source_file: fileURLToPath(new URL('../data/supplier.json', import.meta.url)) };
   } else if (process.env.NODE_ENV !== 'production' && process.env.QBC_ALLOW_SAMPLE_SUPPLIER === 'true') {
     binding = { supplier_id: 'pilot-supplier', account_id: 'normal', branch: 'sample-main' };
   } else throw new Error('Configure supplier access for this workspace.');
-  const data = await supplierProvider({ file: binding.source_file, production: process.env.NODE_ENV === 'production', allowSample: false })(binding.supplier_id);
+  const data = await supplierProvider({ file: binding.source_file, production: process.env.NODE_ENV === 'production', allowSample: demo })(binding.supplier_id);
+  if (demo && data.sample_data !== true) throw new Error('Demo supplier requires explicitly labeled sample data.');
   if (data.branch !== binding.branch || !data.accounts.some(account => account.id === binding.account_id)) throw new Error('Supplier scope is unavailable.');
   return { binding, data };
 }

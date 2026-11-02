@@ -35,6 +35,8 @@ The hosted production backend deliberately refuses the local sample supplier fal
 
 The supplier feed must write that private source file and keep it current using atomic replacement. Follow the existing supplier dataset schema and access checks; a sample fixture is not an authorized commercial feed. Non-sample data is rejected once older than `SUPPLIER_MAX_AGE_SECONDS` (default 300 seconds). Stock, prices, credit, commercial-use permissions and validity are checked again at approval. If supplier access is not configured, the materials workflow refuses to quote; `/ready` confirms database availability, not live supplier or Anthropic connectivity.
 
+For a hosted demonstration using the bundled synthetic catalog, set `QBC_DEMO_SUPPLIER_TENANTS=buildbridge-demo` on the demo Render service, leaving `QBC_SUPPLIER_BINDINGS_FILE` unset. This is an exact workspace allowlist: only named tenants use the bundled `normal` sample account and `sample-main` branch. A configured real binding file takes precedence and never falls back to demo data after an error. The API, form, quote warning, and PDF identify sample data. Keep `NODE_ENV=production`; this setting does not enable sample access for other tenants or the separate Node pilot. Remove the allowlist and configure authorized, current supplier feeds before commercial use. This optional demo variable is managed directly on the demo service; the production Blueprint does not enable it.
+
 ## 3. Create the frontend on Vercel
 
 Import the same GitHub repository with these project settings:

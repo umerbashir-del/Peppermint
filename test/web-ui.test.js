@@ -169,6 +169,14 @@ test('settings navigation reveals the form and pricing source explains the selec
   assert.match(page.get('workflow-help').textContent, /Labor is excluded/);
 });
 
+test('hosted supplier demo is labeled before the user submits a quote', async () => {
+  const page = await browser({fetch:(path,options,response,routes)=>response(path==='/auth/me'?{id:'owner',role:'owner',tenant_id:'buildbridge-demo',supplier_demo:true}:routes[path]||{})});
+  assert.match(page.get('workflow-help').textContent,/SAMPLE DATA/);
+  assert.match(page.get('workflow-help').textContent,/No live supplier connection/);
+  page.get('job-workflow').value='crew';page.get('job-workflow').listeners.change();
+  assert.match(page.get('workflow-help').textContent,/uploaded price list/);
+});
+
 test('reviewers see review instructions rather than an empty drafting form or unavailable settings', async () => {
   const page = await browser({ fetch: (path, options, response, routes) => response(path === '/auth/me' ? { id: 'reviewer', role: 'reviewer', tenant_id: 'a' } : routes[path] || {}) });
   assert.equal(page.get('job-form').classList.contains('hidden'), true);

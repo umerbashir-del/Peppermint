@@ -100,3 +100,25 @@ test('production bindings deny other tenants and do not invent source permission
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test('hosted demo catalog requires an exact tenant allowlist and preserves sample provenance', async () => {
+  const prior = Object.fromEntries(['NODE_ENV','QBC_SUPPLIER_BINDINGS_FILE','QBC_DEMO_SUPPLIER_TENANTS','QBC_ALLOW_SAMPLE_SUPPLIER'].map(key => [key,process.env[key]]));
+  try {
+    process.env.NODE_ENV = 'production';
+    delete process.env.QBC_SUPPLIER_BINDINGS_FILE;
+    process.env.QBC_ALLOW_SAMPLE_SUPPLIER = 'true';
+    delete process.env.QBC_DEMO_SUPPLIER_TENANTS;
+    await assert.rejects(websiteSupplier('buildbridge-demo'), /Configure supplier access/);
+    process.env.QBC_DEMO_SUPPLIER_TENANTS = ' buildbridge-demo ';
+    const source = await websiteSupplier('buildbridge-demo');
+    assert.equal(source.data.sample_data, true);
+    assert.equal(source.binding.account_id, 'normal');
+    await assert.rejects(websiteSupplier('buildbridge-demo-other'), /Configure supplier access/);
+    const result = await runWebsiteAgents({...input('10 of 2x4x8 SPF studs'),tenant_id:'buildbridge-demo'}, {live:false});
+    assert.equal(result.supplier.data.sample_data,true);
+    assert.equal(result.supplier.data.total_cents,3864);
+    assert.equal(result.ready,true);
+    process.env.QBC_SUPPLIER_BINDINGS_FILE = 'missing-private-binding.json';
+    await assert.rejects(websiteSupplier('buildbridge-demo'), /ENOENT/);
+  } finally { for (const [key,value] of Object.entries(prior)) { if(value===undefined)delete process.env[key];else process.env[key]=value; } }
+});

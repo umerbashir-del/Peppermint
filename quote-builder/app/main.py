@@ -245,7 +245,8 @@ def logout(u=Depends(current_user)):
 
 @app.get('/auth/me')
 def me(u=Depends(current_user)):
-    return u
+    demo_tenants = {value.strip() for value in os.getenv('QBC_DEMO_SUPPLIER_TENANTS', '').split(',') if value.strip()}
+    return {**u, 'supplier_demo': not os.getenv('QBC_SUPPLIER_BINDINGS_FILE') and u['tenant_id'] in demo_tenants}
 
 
 @app.post("/auth/bootstrap")

@@ -31,6 +31,9 @@ def render_quote_pdf(snapshot: dict, quote_id: str, snapshot_hash: str, status: 
         _p(f"Quote version {snapshot.get('version')} · status {status}", styles["Normal"]),
         Spacer(1, 12),
     ]
+    if any(str(warning).startswith('SAMPLE SUPPLIER DATA:') for warning in snapshot.get('warnings', [])):
+        story += [_p('DEMO — SAMPLE SUPPLIER DATA', styles['Heading2']),
+                  _p('For demonstration only. Prices, stock, and account figures are synthetic; this is not a live commercial quote.', styles['Normal']), Spacer(1, 12)]
     if text.get("scope_text"):
         story += [_p("Scope of work", styles["Heading3"]), _p(text["scope_text"], styles["Normal"]), Spacer(1, 8)]
     # Customer wording (slots already filled and checked) when present; otherwise the item descriptions with direct cost.
