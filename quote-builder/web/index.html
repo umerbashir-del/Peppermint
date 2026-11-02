@@ -45,12 +45,12 @@
     <div class="sidebar-note"><strong>Every draft gets a review.</strong><p>Check scope, pricing, and questions before approving a quote.</p></div>
   </aside>
   <div class="workspace-body">
-    <div class="welcome" id="quote-desk"><div><p class="eyebrow">BuildBridge / Workspace</p><h1>Quote desk</h1><p>Create a draft or pick up a job that needs review.</p></div><button id="refresh" class="btn secondary">Refresh workspace</button></div>
+    <div class="welcome" id="quote-desk"><div><p class="eyebrow">BuildBridge / Workspace</p><h1>Quote desk</h1><p id="welcome-description">Create a draft or pick up a job that needs review.</p></div><button id="refresh" class="btn secondary">Refresh workspace</button></div>
     <dl class="stats" aria-label="Workspace totals"><div><dt>Projects</dt><dd id="project-count">—</dd></div><div><dt>Awaiting review</dt><dd id="review-count">—</dd></div><div><dt>Approved quotes</dt><dd id="approved-count">—</dd></div></dl>
     <div class="layout">
       <div class="draft-column">
         <section class="panel compose-panel" aria-labelledby="job-heading">
-          <div class="section-heading"><h2 id="job-heading">New quote</h2><span class="section-label">Drafting</span></div>
+          <div class="section-heading"><h2 id="job-heading">New quote</h2><span id="job-mode-label" class="section-label">Drafting</span></div>
           <form id="job-form">
             <div class="form-grid"><div class="field"><label for="job-project">Project name</label><input id="job-project" required maxlength="200" placeholder="e.g. Oak Street renovation"></div><div class="field"><label for="job-customer">Customer <span class="optional">optional</span></label><input id="job-customer" maxlength="200" placeholder="Customer or company"></div></div>
             <div class="field"><label for="job-workflow">Pricing source</label><select id="job-workflow"><option value="supplier">Supplier materials and specification research</option><option value="crew">Job estimate from uploaded price list</option></select><p id="workflow-help" class="field-help">One material per line. Pricing and availability are checked against your supplier account.</p></div>
@@ -58,6 +58,7 @@
             <details class="adjustments"><summary>Pricing adjustments <span>Overhead &amp; markup</span></summary><div class="form-grid"><div class="field"><label for="job-overhead">Overhead (%)</label><input id="job-overhead" type="number" min="0" max="100" step="any" value="0"></div><div class="field"><label for="job-markup">Markup (%)</label><input id="job-markup" type="number" min="0" max="500" step="any" value="0"></div></div></details>
             <div class="form-footer"><p class="small">A draft is prepared for review.<br>Nothing is sent to the customer.</p><button class="btn primary" type="submit">Create draft <span aria-hidden="true">→</span></button></div>
           </form>
+          <p id="job-readonly-hint" class="small hidden">Open a saved job or a quote from the review queue to inspect its details.</p>
           <div id="job-result" class="result hidden" aria-live="polite"></div>
         </section>
         <section id="quote-detail" class="panel hidden" aria-labelledby="quote-review-heading"><div class="section-heading"><h2 id="quote-review-heading">Quote review</h2><span class="section-label">Review before approval</span></div><div id="quote-body"></div></section>
@@ -68,7 +69,7 @@
       </div>
     </div>
     <section class="panel projects-panel" id="projects-section" aria-labelledby="projects-heading"><div class="section-heading"><h2 id="projects-heading">Projects</h2><span class="section-label">Workspace records</span></div><div class="table-wrap"><table><thead><tr><th scope="col">Project</th><th scope="col">Created</th></tr></thead><tbody id="projects-table"><tr><td colspan="2" class="empty">No projects loaded.</td></tr></tbody></table></div></section>
-    <details class="workspace-settings" id="workspace-settings"><summary><span>Workspace settings<small>Contractor details, price lists, and scope</small></span><span class="settings-toggle" aria-hidden="true">+</span></summary>
+    <details class="workspace-settings" id="workspace-settings"><summary><span>Workspace settings<small id="settings-description">Contractor details, price lists, and scope</small></span><span class="settings-toggle" aria-hidden="true">+</span></summary>
       <div class="settings-grid">
         <section class="panel"><div class="section-heading"><h2>Contractor profile</h2></div><form id="profile-form">
           <div class="field"><label for="p-license">License number</label><input id="p-license" maxlength="60"></div><div class="field"><label for="p-insurance">Insurance</label><input id="p-insurance" maxlength="500"></div><div class="field"><label for="p-terms">Payment terms</label><input id="p-terms" maxlength="500"></div>

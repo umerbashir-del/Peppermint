@@ -117,6 +117,10 @@ async function loadAll() {
     }
     $('job-form').classList.toggle('hidden', !canCreate());
     $('job-heading').textContent = canCreate() ? 'New quote' : 'Job details';
+    $('job-mode-label').textContent = canCreate() ? 'Drafting' : 'View details';
+    $('job-readonly-hint').classList.toggle('hidden', canCreate() || !$('job-result').classList.contains('hidden'));
+    $('welcome-description').textContent = canCreate() ? 'Create a draft or pick up a job that needs review.' : 'Review quotes and resolve the details before approval.';
+    $('settings-description').textContent = canManage() ? 'Contractor details, price lists, and scope' : canCreate() ? 'Contractor details and project scope' : 'Contractor details';
     $('scope-form').closest('section').classList.toggle('hidden', !canCreate());
     $('price-upload').closest('section').classList.toggle('hidden', !canManage());
     $('profile-form').querySelectorAll('input, button').forEach(control => { control.disabled = !canManage(); });
@@ -201,6 +205,7 @@ updateJobHint();
 
 // ---------- job from notes ----------
 function renderJob(job) {
+  $('job-readonly-hint').classList.add('hidden');
   const panel = $("job-result");
   const lines = [];
   lines.push(`<p><span class="status ${job.status === "ready" ? "ok" : "warn"}">${esc(jobLabel(job.status))}</span>

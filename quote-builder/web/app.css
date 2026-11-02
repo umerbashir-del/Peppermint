@@ -23,8 +23,8 @@ button, a, input, select, textarea, summary { -webkit-tap-highlight-color: trans
 :focus-visible { outline: 3px solid #7c9e82; outline-offset: 3px; }
 .hidden { display: none !important; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
-.skip-link { position: fixed; top: -80px; left: 20px; z-index: 2000; background: var(--green); color: white; padding: 10px 16px; }
-.skip-link:focus { top: 10px; }
+.skip-link { position: fixed; top: 10px; left: 20px; z-index: 2000; background: var(--green); color: white; padding: 10px 16px; clip-path: inset(50%); width: 1px; height: 1px; overflow: hidden; white-space: nowrap; }
+.skip-link:focus { clip-path: none; width: auto; height: auto; overflow: visible; }
 .app-header { height: 76px; padding: 0 36px; border-bottom: 1px solid var(--line); background: var(--panel); display: flex; justify-content: space-between; align-items: center; gap: 20px; }
 .brand { display: inline-flex; align-items: center; gap: 11px; color: var(--ink); font-weight: 650; font-size: 21px; letter-spacing: -.8px; text-decoration: none; }
 .mark { width: 30px; height: 33px; display: grid; place-items: center; background: var(--green); color: white; font-family: Georgia, serif; font-size: 23px; font-weight: 400; border-radius: 2px; }

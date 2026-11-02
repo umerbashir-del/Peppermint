@@ -23,6 +23,7 @@ async function browser(extra = {}) {
     get(form).controls = [...fields.map(get), get(form).button];
   }
   get('job-workflow').value = 'supplier';
+  get('job-result').classList.add('hidden');
   const events = {}, calls = [], timers = [], storage = new Map([['qbc_token', 'session-A']]);
   const pending = { id: 'pending-job', project_name: 'Saved question job', status: 'needs_input', workflow: 'supplier', notes: 'some wood', questions: ['PRIVATE question'], policy: {}, quote: null };
   const routes = { '/projects': [{ id: 'private-project', name: 'PRIVATE Project' }], '/quotes': [], '/price-items?limit=200': [{ id: 'private-price', name: 'PRIVATE Catalog', unit: 'each', unit_price: '4.20' }], '/jobs': [pending], '/jobs/pending-job': pending,
@@ -102,6 +103,15 @@ test('settings navigation reveals the form and pricing source explains the selec
   page.get('job-workflow').listeners.change();
   assert.equal(page.get('job-notes-label').textContent, 'Materials list');
   assert.match(page.get('workflow-help').textContent, /Labor is excluded/);
+});
+
+test('reviewers see review instructions rather than an empty drafting form or unavailable settings', async () => {
+  const page = await browser({ fetch: (path, options, response, routes) => response(path === '/auth/me' ? { id: 'reviewer', role: 'reviewer', tenant_id: 'a' } : routes[path] || {}) });
+  assert.equal(page.get('job-form').classList.contains('hidden'), true);
+  assert.equal(page.get('job-mode-label').textContent, 'View details');
+  assert.equal(page.get('job-readonly-hint').classList.contains('hidden'), false);
+  assert.match(page.get('welcome-description').textContent, /Review quotes/);
+  assert.equal(page.get('settings-description').textContent, 'Contractor details');
 });
 
 test('split-host frontend routes authenticated requests, sign-in, uploads, PDFs, and logout to its backend', async () => {
