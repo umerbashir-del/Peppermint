@@ -1,5 +1,7 @@
 # BuildBridge
 
+The Python quote-builder website now connects to the existing supplier and research agents and loads the root `.env` Anthropic key. See [website agent setup](quote-builder/docs/AGENT_INTEGRATION.md) for port-8000 startup, scoped supplier bindings, and review rules. The port-3000 Node pilot remains a separate service.
+
 ## Pilot service: sign-in, permissions, and quote review
 
 The integration branch now includes an authenticated quote desk and PostgreSQL-backed review workflow. Your partner's orchestrator is still independent. Requires **Node.js 24+**.

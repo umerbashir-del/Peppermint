@@ -3,13 +3,14 @@
 ## Verified in this build
 | Check | How | Result |
 |---|---|---|
-| Unit and API tests | `pytest -q --cov=app` | 102 passed, 93% coverage (gate 80%) |
+| Unit, API, and client behavior tests | `npm test`, `pytest quote-builder/tests -q` | 156 JavaScript and 125 Python tests pass; coverage was not remeasured in this run |
 | Lint, types | `ruff check`, `mypy app` | clean |
 | Dependencies | `pip-audit -r requirements.lock` | no known vulnerabilities at build time |
 | Migrations | applied fresh and re-run | idempotent |
 | Live server | uvicorn with runtime deps only | health, ready, headers, CSP, static files |
 | End-to-end over HTTP | bootstrap → price list → scope → quote → reviewer approve → PDF → audit verify → logout | passed; PDF renders |
 | Red-team cases | `tests/test_redteam.py` | see table below |
+| Browser workflow | Chrome on Windows, labelled sample supplier data | owner sign-in, draft creation, question recovery after refresh, correction, reviewer approval/rejection, PDF download, and narrow desktop layout passed |
 
 ## Red-team coverage (from the assessment)
 | ID | Status | Where |
@@ -41,10 +42,10 @@
 
 ## Open gaps (must close or formally accept before real customers)
 1. **Database:** SQLite only. Postgres, managed migrations and a concurrency test suite are required before more than one machine.
-2. **Real model not tested.** The gateway is covered with a mock transport. Quality of prompts, cost per job, and latency are unmeasured. Run the eval cases against a real model and record results.
+2. **Model quality is not established.** Live Anthropic smoke tests passed on labelled sample data, and provider failures are injected in tests. Supplier-reviewed accuracy, cost per job, and latency still need representative evaluation data.
 3. **Real price list not tested.** Only labelled test data is in the repo. Test a real contractor's CSV.
-4. **Deploy not verified** against a live Fly account or a live Docker daemon in CI.
-5. **Browser UI not exercised** in a real browser. Only the script's syntax and the server's responses were checked.
+4. **Python production deployment is not verified** against a live Fly account. The separate Node pilot's images and PostgreSQL recovery drill pass CI; that does not deploy the Python website.
+5. **Browser coverage is limited.** The core website workflow passed in Chrome on Windows, including a narrow desktop window. Other browsers, actual mobile devices, and a full accessibility audit remain untested.
 6. **Data retention** for notes, customers and audit rows is not automated.
 7. **Account management:** no email verification, password reset, or MFA. Deactivation and logout work.
 8. **Rate limits and lockout** are per process and in memory for limits (lockout is in the database).
