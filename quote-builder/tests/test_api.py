@@ -46,12 +46,25 @@ def test_bootstrap_is_closed_after_first_user_unless_explicitly_allowed(client, 
     assert r.status_code == 404
 
 
-def test_login_locks_after_repeated_failures(client):
+def test_login_accepts_correct_password_after_repeated_failures(client):
     bootstrap_owner(client)
     for _ in range(5):
         assert client.post("/auth/login", json={"tenant_id": "tenant-a", "email": "owner@example.test", "password": "wrong-password-x"}).status_code == 401
     r = client.post("/auth/login", json={"tenant_id": "tenant-a", "email": "owner@example.test", "password": GOOD_PASSWORD})
-    assert r.status_code == 429
+    assert r.status_code == 200
+
+
+def test_login_ignores_previous_account_lock(client):
+    bootstrap_owner(client)
+    import time
+    from app.db import connect
+    with connect() as c:
+        c.execute('INSERT INTO login_attempts(key,failures,locked_until) VALUES(?,?,?)',
+                  ('tenant-a|owner@example.test', 5, time.time() + 900))
+    r = client.post('/auth/login', json={'tenant_id': 'tenant-a', 'email': 'owner@example.test', 'password': GOOD_PASSWORD})
+    assert r.status_code == 200
+    with connect() as c:
+        assert c.execute('SELECT count(*) FROM login_attempts').fetchone()[0] == 0
 
 
 # ---------- sessions and users ----------

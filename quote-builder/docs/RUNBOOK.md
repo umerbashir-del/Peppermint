@@ -23,7 +23,7 @@ Do not scale above one machine while the database is SQLite on a volume.
 - **Suspected account compromise:** deactivate the user with `PATCH /users/{id}` (this revokes their tokens), then review `GET /audit`.
 - **Suspected wrong quote sent:** the system never sends. Check `GET /audit` for approvals and the snapshot hash that was approved.
 - **Audit verification fails:** stop writes, snapshot the database, and treat the rows after the first bad row as tampered.
-- **Locked-out contractor:** lockout clears after 15 minutes; `login_attempts` rows can be deleted for that key.
+- **Sign-in throttled:** the website limits sign-in requests to 20 per IP per minute. Wait one minute before retrying. There is no per-account failed-password lockout; a correct password works even if a legacy `login_attempts` row remains. Repeated invalid-credential responses require checking the workspace ID, email, and password.
 - **LLM gateway down:** `POST /jobs` returns 502/503 or a failed half. The rest of the app keeps working.
 
 ## Data handling

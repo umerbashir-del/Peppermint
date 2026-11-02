@@ -48,7 +48,7 @@
 5. **Browser coverage is limited.** The core website workflow passed in Chrome on Windows, including a narrow desktop window. Other browsers, actual mobile devices, and a full accessibility audit remain untested.
 6. **Data retention** for notes, customers and audit rows is not automated.
 7. **Account management:** no email verification, password reset, or MFA. Deactivation and logout work.
-8. **Rate limits and lockout** are per process and in memory for limits (lockout is in the database).
+8. **Rate limits** are per process and in memory. Website sign-in is limited to 20 requests per IP per minute; there is no per-account failed-password lockout.
 9. **Business rules need domain sign-off:** tax base (currently overhead + markup), labor classification, units, validity periods, and the $5,000 review threshold.
 10. **Quote wording** is model text. Digits are checked; words are not. Human review is the control.
 11. **Money columns** on `quotes` are `REAL`. Snapshots are exact.

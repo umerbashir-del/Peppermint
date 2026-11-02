@@ -33,8 +33,6 @@ from app.security import DUMMY_HASH, current_user, hash_password, token_for, val
 log = logging.getLogger("qbc")
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
 EMAIL_PATTERN = r"^[^@\s]+@[^@\s]+\.[^@\s]+$"
-LOCK_SECONDS = 900
-MAX_FAILURES = 5
 SOURCE_ALLOWED = {"supplier_quote", "supplier_invoice", "supplier_price_sheet"}  # deny by default
 
 
@@ -224,20 +222,11 @@ def login(data: Login, request: Request):
     if not ratelimit.allow(f"login-ip:{ip}", 20, 60):
         raise HTTPException(429, "Too many attempts. Try again later.")
     key = f"{data.tenant_id}|{data.email.lower()}"
-    now = time.time()
     with connect() as c:
-        attempt = c.execute("SELECT failures, locked_until FROM login_attempts WHERE key=?", (key,)).fetchone()
-        if attempt and attempt["locked_until"] > now:
-            raise HTTPException(429, "Account temporarily locked. Try again later.")
         row = c.execute("SELECT * FROM users WHERE tenant_id=? AND email=? AND active=1",
                         (data.tenant_id, data.email.lower())).fetchone()
         password_ok = verify_password(data.password, row["password_hash"] if row else DUMMY_HASH) and row is not None
         if not password_ok:
-            failures = (attempt["failures"] if attempt else 0) + 1
-            locked_until = now + LOCK_SECONDS if failures >= MAX_FAILURES else 0
-            c.execute("INSERT INTO login_attempts(key,failures,locked_until) VALUES(?,?,?) "
-                      "ON CONFLICT(key) DO UPDATE SET failures=excluded.failures, locked_until=excluded.locked_until",
-                      (key, 0 if locked_until else failures, locked_until))
             user = None
         else:
             c.execute("DELETE FROM login_attempts WHERE key=?", (key,))
